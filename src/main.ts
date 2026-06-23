@@ -119,10 +119,22 @@ export async function run(): Promise<void> {
       }
     }
 
-    if (shouldDownload) {
-      await waitForAssetReady(assetId, cookies, 60000, 5000, assetName)
-      await downloadAsset(assetId, cookies, downloadPath)
-    }
+      if (shouldDownload) {
+        await waitForAssetReady(
+          assetId,
+          cookies,
+          120000,
+          5000,
+          assetName,
+          uploadedVersionId
+        )
+        await downloadAsset(
+          assetId,
+          cookies,
+          downloadPath,
+          uploadedVersionId
+        )
+      }
   } catch (error) {
     if (axios.isAxiosError(error)) {
       type ErrorData = {
@@ -480,87 +492,95 @@ async function waitForAssetReady(
   cookies: string,
   timeout = 60000,
   interval = 5000,
-  assetName?: string
+  assetName?: string,
+  versionId?: number
 ): Promise<void> {
   const startTime = Date.now()
 
   while (Date.now() - startTime < timeout) {
-    let foundAsset: { id: number; name: string; state: string } | null = null
+    const versions = await getAssetVersions(assetId, cookies)
+    const version = versionId
+      ? versions?.find(v => v.id === versionId)
+      : versions?.find(v => v.state === 'active')
 
-    if (assetName) {
-      const res = await axios.get<{
-        items: { id: number; name: string; state: string }[]
-      }>(
-        `https://portal-api.cfx.re/v1/me/assets?page=1&search=${encodeURIComponent(
-          assetName
-        )}&sort=asset.id&direction=desc`,
-        { headers: { Cookie: cookies } }
+    if (version) {
+      core.info(
+        `Version ${version.version ?? version.id} state: ${version.state}`
       )
-      foundAsset =
-        res.data.items.find(
-          item =>
-            String(item.id) === String(assetId) || item.name === assetName
-        ) ?? null
-    } else {
-      let page = 1
-      while (!foundAsset) {
-        const res = await axios.get<{
-          items: { id: number; name: string; state: string }[]
-        }>(
-          `https://portal-api.cfx.re/v1/me/assets?page=${page}&search=&sort=asset.id&direction=desc`,
-          { headers: { Cookie: cookies } }
-        )
-        const items = res.data.items
-        if (!items || items.length === 0) break
-        foundAsset =
-          items.find(item => String(item.id) === String(assetId)) ?? null
-        if (!foundAsset) {
-          page++
-        }
-      }
-    }
-
-    if (foundAsset) {
-      core.debug(`Asset state: ${foundAsset.state}`)
-      if (foundAsset.state === 'active') {
+      if (version.state === 'active' && version.packs?.length) {
         core.info('Asset is ready for download.')
         return
-      } else {
-        core.info(`Asset state is '${foundAsset.state}'. Waiting...`)
       }
     } else {
-      core.info('Asset not found in response. Waiting...')
+      core.info(
+        assetName
+          ? `Version active introuvable pour ${assetName}. Waiting...`
+          : 'Version not found. Waiting...'
+      )
     }
+
     await new Promise(resolve => setTimeout(resolve, interval))
   }
+
   throw new Error(
     'Asset was not ready for download within the specified timeout.'
   )
 }
 
+async function resolveDownloadPack(
+  assetId: string,
+  cookies: string,
+  versionId?: number
+): Promise<{ versionId: number; packId: number }> {
+  const versions = await getAssetVersions(assetId, cookies)
+  const version = versionId
+    ? versions?.find(v => v.id === versionId)
+    : versions?.find(v => v.state === 'active')
+
+  if (!version?.packs?.length) {
+    throw new Error(
+      `Aucun pack téléchargeable pour l'asset ${assetId}` +
+        (versionId ? ` (version ${versionId})` : '')
+    )
+  }
+
+  return { versionId: version.id, packId: version.packs[0].id }
+}
+
 /**
- * Downloads the asset file from the portal.
- * @param assetId
- * @param cookies
- * @param downloadPath The file path where the asset will be saved.
- * @returns {Promise<void>} Resolves when the download is complete.
+ * Downloads the encrypted pack from the portal (escrow).
+ * Uses /assets/{id}/versions/{version_id}/packs/{pack_id}/download
+ * — /assets/{id}/download returns 404 for escrow assets.
  */
 async function downloadAsset(
   assetId: string,
   cookies: string,
-  downloadPath: string
+  downloadPath: string,
+  versionId?: number
 ): Promise<void> {
-  const portalDownloadUrl = `https://portal-api.cfx.re/v1/assets/${assetId}/download`
+  const { versionId: vid, packId } = await resolveDownloadPack(
+    assetId,
+    cookies,
+    versionId
+  )
+
+  const portalDownloadUrl = getUrl('PACK_DOWNLOAD', {
+    id: assetId,
+    version_id: vid,
+    pack_id: packId
+  })
   core.info(`Fetching download URL from ${portalDownloadUrl} ...`)
 
   const initialResponse = await axios.get<{ url: string }>(portalDownloadUrl, {
-    headers: {
-      Cookie: cookies
-    },
+    headers: { Cookie: cookies },
     responseType: 'json'
   })
 
   const realDownloadUrl = initialResponse.data.url
+  if (!realDownloadUrl) {
+    throw new Error('URL de téléchargement manquante dans la réponse portal')
+  }
+
   core.info(`Downloading asset from ${realDownloadUrl} ...`)
 
   const response = await axios.get(realDownloadUrl, {

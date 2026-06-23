@@ -92299,6 +92299,7 @@ var Urls = /* @__PURE__ */ ((Urls2) => {
   Urls2["COMPLETE_UPLOAD"] = "assets/{id}/versions/{version_id}/complete-upload";
   Urls2["ASSET_DETAIL"] = "assets/{id}";
   Urls2["DELETE_VERSION"] = "assets/{id}/versions/{version_id}";
+  Urls2["PACK_DOWNLOAD"] = "assets/{id}/versions/{version_id}/packs/{pack_id}/download";
   return Urls2;
 })(Urls || {});
 
@@ -92659,8 +92660,20 @@ async function run() {
       }
     }
     if (shouldDownload) {
-      await waitForAssetReady(assetId, cookies, 6e4, 5e3, assetName);
-      await downloadAsset(assetId, cookies, downloadPath);
+      await waitForAssetReady(
+        assetId,
+        cookies,
+        12e4,
+        5e3,
+        assetName,
+        uploadedVersionId
+      );
+      await downloadAsset(
+        assetId,
+        cookies,
+        downloadPath,
+        uploadedVersionId
+      );
     }
   } catch (error2) {
     if (axios_default.isAxiosError(error2)) {
@@ -92851,45 +92864,23 @@ async function completeUpload(assetId, versionId, cookies) {
   );
   core2.info("Upload completed.");
 }
-async function waitForAssetReady(assetId, cookies, timeout2 = 6e4, interval = 5e3, assetName) {
+async function waitForAssetReady(assetId, cookies, timeout2 = 6e4, interval = 5e3, assetName, versionId) {
   const startTime = Date.now();
   while (Date.now() - startTime < timeout2) {
-    let foundAsset = null;
-    if (assetName) {
-      const res = await axios_default.get(
-        `https://portal-api.cfx.re/v1/me/assets?page=1&search=${encodeURIComponent(
-          assetName
-        )}&sort=asset.id&direction=desc`,
-        { headers: { Cookie: cookies } }
+    const versions = await getAssetVersions(assetId, cookies);
+    const version = versionId ? versions?.find((v2) => v2.id === versionId) : versions?.find((v2) => v2.state === "active");
+    if (version) {
+      core2.info(
+        `Version ${version.version ?? version.id} state: ${version.state}`
       );
-      foundAsset = res.data.items.find(
-        (item) => String(item.id) === String(assetId) || item.name === assetName
-      ) ?? null;
-    } else {
-      let page = 1;
-      while (!foundAsset) {
-        const res = await axios_default.get(
-          `https://portal-api.cfx.re/v1/me/assets?page=${page}&search=&sort=asset.id&direction=desc`,
-          { headers: { Cookie: cookies } }
-        );
-        const items = res.data.items;
-        if (!items || items.length === 0) break;
-        foundAsset = items.find((item) => String(item.id) === String(assetId)) ?? null;
-        if (!foundAsset) {
-          page++;
-        }
-      }
-    }
-    if (foundAsset) {
-      core2.debug(`Asset state: ${foundAsset.state}`);
-      if (foundAsset.state === "active") {
+      if (version.state === "active" && version.packs?.length) {
         core2.info("Asset is ready for download.");
         return;
-      } else {
-        core2.info(`Asset state is '${foundAsset.state}'. Waiting...`);
       }
     } else {
-      core2.info("Asset not found in response. Waiting...");
+      core2.info(
+        assetName ? `Version active introuvable pour ${assetName}. Waiting...` : "Version not found. Waiting..."
+      );
     }
     await new Promise((resolve7) => setTimeout(resolve7, interval));
   }
@@ -92897,16 +92888,36 @@ async function waitForAssetReady(assetId, cookies, timeout2 = 6e4, interval = 5e
     "Asset was not ready for download within the specified timeout."
   );
 }
-async function downloadAsset(assetId, cookies, downloadPath) {
-  const portalDownloadUrl = `https://portal-api.cfx.re/v1/assets/${assetId}/download`;
+async function resolveDownloadPack(assetId, cookies, versionId) {
+  const versions = await getAssetVersions(assetId, cookies);
+  const version = versionId ? versions?.find((v2) => v2.id === versionId) : versions?.find((v2) => v2.state === "active");
+  if (!version?.packs?.length) {
+    throw new Error(
+      `Aucun pack t\xE9l\xE9chargeable pour l'asset ${assetId}` + (versionId ? ` (version ${versionId})` : "")
+    );
+  }
+  return { versionId: version.id, packId: version.packs[0].id };
+}
+async function downloadAsset(assetId, cookies, downloadPath, versionId) {
+  const { versionId: vid, packId } = await resolveDownloadPack(
+    assetId,
+    cookies,
+    versionId
+  );
+  const portalDownloadUrl = getUrl("PACK_DOWNLOAD", {
+    id: assetId,
+    version_id: vid,
+    pack_id: packId
+  });
   core2.info(`Fetching download URL from ${portalDownloadUrl} ...`);
   const initialResponse = await axios_default.get(portalDownloadUrl, {
-    headers: {
-      Cookie: cookies
-    },
+    headers: { Cookie: cookies },
     responseType: "json"
   });
   const realDownloadUrl = initialResponse.data.url;
+  if (!realDownloadUrl) {
+    throw new Error("URL de t\xE9l\xE9chargement manquante dans la r\xE9ponse portal");
+  }
   core2.info(`Downloading asset from ${realDownloadUrl} ...`);
   const response = await axios_default.get(realDownloadUrl, {
     responseType: "stream"
