@@ -44,6 +44,13 @@ inputs:
   skipUpload:
     description: 'Skip the upload and only go through the login process'
     required: false
+  download:
+    description: 'Download the asset after upload'
+    required: false
+    default: false
+  downloadPath:
+    description: 'The path where the downloaded asset will be saved'
+    required: false
   chunkSize:
     description: 'The chunk size to split the file into'
     required: false

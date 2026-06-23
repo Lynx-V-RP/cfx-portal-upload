@@ -22,7 +22,8 @@ const utilsMock = {
 
 const fsMock = {
   statSync: jest.fn(),
-  createReadStream: jest.fn()
+  createReadStream: jest.fn(),
+  createWriteStream: jest.fn()
 }
 
 function mockEmptyUpload(): void {
@@ -45,7 +46,8 @@ jest.unstable_mockModule('fs', () => {
   return {
     ...actualFs,
     statSync: fsMock.statSync,
-    createReadStream: fsMock.createReadStream
+    createReadStream: fsMock.createReadStream,
+    createWriteStream: fsMock.createWriteStream
   }
 })
 
@@ -380,6 +382,85 @@ describe('main', () => {
     expect(core.info).toHaveBeenCalledWith('Redirected to CFX Portal.')
     expect(core.info).toHaveBeenCalledWith('Skipping upload...')
     expect(axios.post).not.toHaveBeenCalled()
+  })
+
+  it('should download asset after upload when download is true', async () => {
+    const mockWriter = {
+      on: jest.fn((event: string, callback: () => void) => {
+        if (event === 'finish') {
+          callback()
+        }
+      })
+    }
+    const mockStream = {
+      pipe: jest.fn()
+    }
+
+    fsMock.createWriteStream.mockReturnValue(mockWriter)
+    ;(core.getInput as jest.Mock).mockImplementation((name: string) => {
+      switch (name) {
+        case 'assetId':
+          return '123'
+        case 'zipPath':
+          return 'test.zip'
+        case 'cookie':
+          return 'test-cookie'
+        case 'chunkSize':
+          return '1024'
+        case 'maxRetries':
+          return '1'
+        case 'download':
+          return 'true'
+        case 'downloadPath':
+          return 'downloaded.zip'
+        default:
+          return 'false'
+      }
+    })
+
+    pageMock.evaluate.mockResolvedValueOnce({ url: 'https://forum-redirect' })
+    pageMock.url.mockReturnValue('https://portal.cfx.re')
+    ;(utils.getFxManifestVersion as jest.Mock).mockReturnValue('1.0.0')
+    ;(utils.getChangelog as jest.Mock).mockReturnValue('test changelog')
+    ;(axios.post as jest.Mock).mockResolvedValue({
+      data: {
+        asset_id: 123,
+        version_id: 456,
+        errors: null
+      }
+    })
+    ;(axios.get as jest.Mock)
+      .mockResolvedValueOnce({
+        data: {
+          items: [{ id: 123, name: 'test-asset', state: 'active' }]
+        }
+      })
+      .mockResolvedValueOnce({
+        data: { url: 'https://cdn.example.com/asset.zip' }
+      })
+      .mockResolvedValueOnce({
+        data: mockStream
+      })
+
+    await main.run()
+
+    expect(axios.get as jest.Mock).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/me/assets'),
+      expect.objectContaining({ headers: { Cookie: expect.any(String) } })
+    )
+    expect(axios.get as jest.Mock).toHaveBeenCalledWith(
+      'https://portal-api.cfx.re/v1/assets/123/download',
+      expect.objectContaining({ headers: { Cookie: expect.any(String) } })
+    )
+    expect(axios.get as jest.Mock).toHaveBeenCalledWith(
+      'https://cdn.example.com/asset.zip',
+      expect.objectContaining({ responseType: 'stream' })
+    )
+    expect(fsMock.createWriteStream).toHaveBeenCalledWith('downloaded.zip')
+    expect(mockStream.pipe).toHaveBeenCalledWith(mockWriter)
+    expect(core.info).toHaveBeenCalledWith(
+      'Downloaded asset saved to downloaded.zip'
+    )
   })
 
   it('should handle axios errors gracefully', async () => {
