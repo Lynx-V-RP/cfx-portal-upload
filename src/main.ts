@@ -223,12 +223,10 @@ export async function run(): Promise<void> {
     }
 
     const changelog = await getChangelog(absoluteZipPath)
-    const version =
+    let version =
       versionInput || (await getFxManifestVersion(absoluteZipPath))
 
-    core.info(`Version envoyée au portal : ${version}`)
-
-    const uploadedVersionId = await uploadZip(
+    const uploadedVersionId = await uploadZipWithVersionRetry(
       absoluteZipPath,
       assetId,
       chunkSize,
@@ -485,6 +483,61 @@ async function getZipPath(
   deleteIfExists('.vscode/')
 
   return zipAsset(assetName)
+}
+
+function bumpPatchVersion(version: string): string {
+  const [major = '0', minor = '0', patch = '0'] = version.split('.')
+  return `${major}.${minor}.${parseInt(patch, 10) + 1}`
+}
+
+function isDuplicateVersionError(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 409) {
+    return false
+  }
+
+  const data = error.response.data as { error_code?: string } | undefined
+  return data?.error_code === 'DUPLICATE_VERSION'
+}
+
+async function uploadZipWithVersionRetry(
+  zipPath: string,
+  assetId: string,
+  chunkSize: number,
+  cookies: string,
+  beta: boolean,
+  version: string,
+  changelog: string,
+  maxAttempts = 5
+): Promise<number> {
+  let currentVersion = version
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      core.info(`Version envoyée au portal : ${currentVersion}`)
+      return await uploadZip(
+        zipPath,
+        assetId,
+        chunkSize,
+        cookies,
+        beta,
+        currentVersion,
+        changelog
+      )
+    } catch (error) {
+      if (isDuplicateVersionError(error) && attempt < maxAttempts) {
+        const nextVersion = bumpPatchVersion(currentVersion)
+        core.warning(
+          `Version ${currentVersion} déjà sur le portal — nouvel essai avec ${nextVersion}`
+        )
+        currentVersion = nextVersion
+        continue
+      }
+
+      throw error
+    }
+  }
+
+  throw new Error(PORTAL_DUPLICATE_VERSION)
 }
 
 /**

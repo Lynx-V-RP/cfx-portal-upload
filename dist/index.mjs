@@ -92734,9 +92734,8 @@ async function run() {
       beta = await isBetaAsset(absoluteZipPath);
     }
     const changelog = await getChangelog(absoluteZipPath);
-    const version = versionInput || await getFxManifestVersion(absoluteZipPath);
-    core2.info(`Version envoy\xE9e au portal : ${version}`);
-    const uploadedVersionId = await uploadZip(
+    let version = versionInput || await getFxManifestVersion(absoluteZipPath);
+    const uploadedVersionId = await uploadZipWithVersionRetry(
       absoluteZipPath,
       assetId,
       chunkSize,
@@ -92897,6 +92896,45 @@ async function getZipPath(assetName, zipPath, makeZip) {
   deleteIfExists(".github/");
   deleteIfExists(".vscode/");
   return zipAsset(assetName);
+}
+function bumpPatchVersion(version) {
+  const [major = "0", minor = "0", patch = "0"] = version.split(".");
+  return `${major}.${minor}.${parseInt(patch, 10) + 1}`;
+}
+function isDuplicateVersionError(error2) {
+  if (!axios_default.isAxiosError(error2) || error2.response?.status !== 409) {
+    return false;
+  }
+  const data = error2.response.data;
+  return data?.error_code === "DUPLICATE_VERSION";
+}
+async function uploadZipWithVersionRetry(zipPath, assetId, chunkSize, cookies, beta, version, changelog, maxAttempts = 5) {
+  let currentVersion = version;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      core2.info(`Version envoy\xE9e au portal : ${currentVersion}`);
+      return await uploadZip(
+        zipPath,
+        assetId,
+        chunkSize,
+        cookies,
+        beta,
+        currentVersion,
+        changelog
+      );
+    } catch (error2) {
+      if (isDuplicateVersionError(error2) && attempt < maxAttempts) {
+        const nextVersion = bumpPatchVersion(currentVersion);
+        core2.warning(
+          `Version ${currentVersion} d\xE9j\xE0 sur le portal \u2014 nouvel essai avec ${nextVersion}`
+        );
+        currentVersion = nextVersion;
+        continue;
+      }
+      throw error2;
+    }
+  }
+  throw new Error(PORTAL_DUPLICATE_VERSION);
 }
 async function startReupload(zipPath, assetId, chunkSize, cookies, beta, version, changelog) {
   const stats = statSync3(zipPath);
