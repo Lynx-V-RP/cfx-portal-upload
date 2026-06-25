@@ -19719,7 +19719,7 @@ var require_core = __commonJS({
 Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
     }
     exports.getBooleanInput = getBooleanInput;
-    function setOutput(name, value) {
+    function setOutput2(name, value) {
       const filePath = process.env["GITHUB_OUTPUT"] || "";
       if (filePath) {
         return (0, file_command_1.issueFileCommand)("OUTPUT", (0, file_command_1.prepareKeyValueMessage)(name, value));
@@ -19727,7 +19727,7 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       process.stdout.write(os10.EOL);
       (0, command_1.issueCommand)("set-output", { name }, (0, utils_1.toCommandValue)(value));
     }
-    exports.setOutput = setOutput;
+    exports.setOutput = setOutput2;
     function setCommandEcho(enabled) {
       (0, command_1.issue)("echo", enabled ? "on" : "off");
     }
@@ -19749,10 +19749,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports.error = error2;
-    function warning2(message, properties = {}) {
+    function warning3(message, properties = {}) {
       (0, command_1.issueCommand)("warning", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports.warning = warning2;
+    exports.warning = warning3;
     function notice(message, properties = {}) {
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -70053,7 +70053,7 @@ var init_esm = __esm({
       process: {
         argv: () => process.argv,
         cwd: process.cwd,
-        emitWarning: (warning2, type) => process.emitWarning(warning2, type),
+        emitWarning: (warning3, type) => process.emitWarning(warning3, type),
         execPath: () => process.execPath,
         exit: process.exit,
         nextTick: process.nextTick,
@@ -72937,9 +72937,9 @@ var init_yargs_factory = __esm({
         });
         delete __classPrivateFieldGet(this, _YargsInstance_usage, "f").getDescriptions()[optionKey];
       }
-      [kEmitWarning](warning2, type, deduplicationId) {
+      [kEmitWarning](warning3, type, deduplicationId) {
         if (!__classPrivateFieldGet(this, _YargsInstance_emittedWarnings, "f")[deduplicationId]) {
-          __classPrivateFieldGet(this, _YargsInstance_shim, "f").process.emitWarning(warning2, type);
+          __classPrivateFieldGet(this, _YargsInstance_shim, "f").process.emitWarning(warning3, type);
           __classPrivateFieldGet(this, _YargsInstance_emittedWarnings, "f")[deduplicationId] = true;
         }
       }
@@ -92588,6 +92588,38 @@ async function deleteAssetVersion(assetId, versionId, cookies) {
 }
 
 // src/main.ts
+var NAVIGATION_TIMEOUT_MS = 6e4;
+var EXPIRED_COOKIE_MESSAGE = "FORUM_COOKIE expir\xE9 ou invalide. Connectez-vous sur forum.cfx.re, copiez le cookie _t (DevTools \u2192 Application \u2192 Cookies), mettez \xE0 jour le secret GitHub FORUM_COOKIE, puis relancez le workflow \xAB Escrow \u2014 refresh cookie \xBB.";
+async function gotoPage(page, url2, waitUntil = "domcontentloaded") {
+  page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS);
+  await page.goto(url2, {
+    waitUntil,
+    timeout: NAVIGATION_TIMEOUT_MS
+  });
+}
+async function waitForPortal(page) {
+  try {
+    await page.waitForFunction(
+      () => window.location.href.includes("portal.cfx.re"),
+      { timeout: NAVIGATION_TIMEOUT_MS }
+    );
+    return true;
+  } catch {
+    return page.url().includes("portal.cfx.re");
+  }
+}
+async function publishRefreshedCookie(browser) {
+  const cookies = await browser.cookies();
+  const authCookie = cookies.find(
+    (cookie) => cookie.name === "_t" && cookie.domain.includes("cfx.re")
+  );
+  if (!authCookie?.value) {
+    core2.warning("Cookie _t introuvable apr\xE8s connexion \u2014 secret non rafra\xEEchi.");
+    return;
+  }
+  core2.setOutput("refreshed-cookie", authCookie.value);
+  core2.info("Cookie _t rafra\xEEchi (output refreshed-cookie).");
+}
 async function run() {
   let browser;
   try {
@@ -92616,6 +92648,7 @@ async function run() {
     }
     if (skipUpload) {
       await loginToPortal(browser, page, maxRetries);
+      await publishRefreshedCookie(browser);
       core2.info("Skipping upload...");
       return;
     }
@@ -92635,6 +92668,7 @@ async function run() {
     }
     const version = await getFxManifestVersion(zipPath);
     await loginToPortal(browser, page, maxRetries);
+    await publishRefreshedCookie(browser);
     core2.info("Redirected to CFX Portal. Uploading file ...");
     const cookies = await getCookies(browser);
     if (assetName) {
@@ -92688,7 +92722,11 @@ async function run() {
         data?.message || data?.errors || message || "Unknown error"
       );
     } else if (error2 instanceof Error) {
-      core2.setFailed(error2.message);
+      if (error2.message.includes("Navigation timeout")) {
+        core2.setFailed(EXPIRED_COOKIE_MESSAGE);
+      } else {
+        core2.setFailed(error2.message);
+      }
     }
   } finally {
     await browser?.close();
@@ -92697,14 +92735,18 @@ async function run() {
 async function loginToPortal(browser, page, maxRetries) {
   const redirectUrl = await getRedirectUrl(page, maxRetries);
   await setForumCookie(browser, page);
-  await page.goto(redirectUrl, {
-    waitUntil: "networkidle0"
-  });
-  if (page.url().includes("portal.cfx.re")) {
+  await gotoPage(page, redirectUrl);
+  if (await waitForPortal(page)) {
     core2.info("Redirected to CFX Portal.");
     return;
   }
-  throw new Error("Redirect failed. Make sure the provided Cookie is valid.");
+  const currentUrl = page.url();
+  if (currentUrl.includes("forum.cfx.re") || currentUrl.includes("login")) {
+    throw new Error(EXPIRED_COOKIE_MESSAGE);
+  }
+  throw new Error(
+    `\xC9chec de redirection vers le portal (${currentUrl}). ${EXPIRED_COOKIE_MESSAGE}`
+  );
 }
 async function getRedirectUrl(page, maxRetries) {
   let loaded = false;
@@ -92713,9 +92755,7 @@ async function getRedirectUrl(page, maxRetries) {
   while (!loaded && attempt < maxRetries) {
     try {
       core2.info("Navigating to SSO URL ...");
-      await page.goto(getUrl("SSO"), {
-        waitUntil: "networkidle0"
-      });
+      await gotoPage(page, getUrl("SSO"), "networkidle0");
       core2.info("Navigated to SSO URL. Parsing response body ...");
       const responseBody = await page.evaluate(
         () => JSON.parse(document.body.innerText)
@@ -92724,7 +92764,7 @@ async function getRedirectUrl(page, maxRetries) {
       redirectUrl = responseBody.url;
       core2.info("Redirected to Forum Origin ...");
       const forumUrl = new URL(redirectUrl).origin;
-      await page.goto(forumUrl);
+      await gotoPage(page, forumUrl);
       loaded = true;
     } catch {
       core2.info(`Failed to navigate to SSO URL. Retrying in 1 seconds...`);

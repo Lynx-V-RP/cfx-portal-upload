@@ -21,6 +21,49 @@ import {
   deleteAssetVersion
 } from './utils.js'
 
+const NAVIGATION_TIMEOUT_MS = 60_000
+const EXPIRED_COOKIE_MESSAGE =
+  'FORUM_COOKIE expiré ou invalide. Connectez-vous sur forum.cfx.re, copiez le cookie _t (DevTools → Application → Cookies), mettez à jour le secret GitHub FORUM_COOKIE, puis relancez le workflow « Escrow — refresh cookie ».'
+
+async function gotoPage(
+  page: Page,
+  url: string,
+  waitUntil: 'domcontentloaded' | 'networkidle0' = 'domcontentloaded'
+): Promise<void> {
+  page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS)
+  await page.goto(url, {
+    waitUntil,
+    timeout: NAVIGATION_TIMEOUT_MS
+  })
+}
+
+async function waitForPortal(page: Page): Promise<boolean> {
+  try {
+    await page.waitForFunction(
+      () => window.location.href.includes('portal.cfx.re'),
+      { timeout: NAVIGATION_TIMEOUT_MS }
+    )
+    return true
+  } catch {
+    return page.url().includes('portal.cfx.re')
+  }
+}
+
+async function publishRefreshedCookie(browser: Browser): Promise<void> {
+  const cookies = await browser.cookies()
+  const authCookie = cookies.find(
+    cookie => cookie.name === '_t' && cookie.domain.includes('cfx.re')
+  )
+
+  if (!authCookie?.value) {
+    core.warning('Cookie _t introuvable après connexion — secret non rafraîchi.')
+    return
+  }
+
+  core.setOutput('refreshed-cookie', authCookie.value)
+  core.info('Cookie _t rafraîchi (output refreshed-cookie).')
+}
+
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
@@ -64,6 +107,7 @@ export async function run(): Promise<void> {
 
     if (skipUpload) {
       await loginToPortal(browser, page, maxRetries)
+      await publishRefreshedCookie(browser)
       core.info('Skipping upload...')
       return
     }
@@ -90,6 +134,7 @@ export async function run(): Promise<void> {
     const version = await getFxManifestVersion(zipPath)
 
     await loginToPortal(browser, page, maxRetries)
+    await publishRefreshedCookie(browser)
 
     core.info('Redirected to CFX Portal. Uploading file ...')
     const cookies = await getCookies(browser)
@@ -155,7 +200,11 @@ export async function run(): Promise<void> {
         data?.message || data?.errors || message || 'Unknown error'
       )
     } else if (error instanceof Error) {
-      core.setFailed(error.message)
+      if (error.message.includes('Navigation timeout')) {
+        core.setFailed(EXPIRED_COOKIE_MESSAGE)
+      } else {
+        core.setFailed(error.message)
+      }
     }
   } finally {
     await browser?.close()
@@ -178,16 +227,21 @@ async function loginToPortal(
   const redirectUrl = await getRedirectUrl(page, maxRetries)
   await setForumCookie(browser, page)
 
-  await page.goto(redirectUrl, {
-    waitUntil: 'networkidle0'
-  })
+  await gotoPage(page, redirectUrl)
 
-  if (page.url().includes('portal.cfx.re')) {
+  if (await waitForPortal(page)) {
     core.info('Redirected to CFX Portal.')
     return
   }
 
-  throw new Error('Redirect failed. Make sure the provided Cookie is valid.')
+  const currentUrl = page.url()
+  if (currentUrl.includes('forum.cfx.re') || currentUrl.includes('login')) {
+    throw new Error(EXPIRED_COOKIE_MESSAGE)
+  }
+
+  throw new Error(
+    `Échec de redirection vers le portal (${currentUrl}). ${EXPIRED_COOKIE_MESSAGE}`
+  )
 }
 
 /**
@@ -207,9 +261,7 @@ async function getRedirectUrl(page: Page, maxRetries: number): Promise<string> {
     try {
       core.info('Navigating to SSO URL ...')
 
-      await page.goto(getUrl('SSO'), {
-        waitUntil: 'networkidle0'
-      })
+      await gotoPage(page, getUrl('SSO'), 'networkidle0')
 
       core.info('Navigated to SSO URL. Parsing response body ...')
 
@@ -224,7 +276,7 @@ async function getRedirectUrl(page: Page, maxRetries: number): Promise<string> {
       core.info('Redirected to Forum Origin ...')
 
       const forumUrl = new URL(redirectUrl).origin
-      await page.goto(forumUrl)
+      await gotoPage(page, forumUrl)
 
       loaded = true
     } catch {

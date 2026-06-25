@@ -91,7 +91,9 @@ describe('main', () => {
       setCookie: jest.fn(),
       cookies: jest
         .fn()
-        .mockResolvedValue([{ name: '_t', value: 'test-cookie' }])
+        .mockResolvedValue([
+          { name: '_t', value: 'test-cookie', domain: 'forum.cfx.re' }
+        ])
     }
     ;(puppeteer.launch as jest.Mock).mockResolvedValue(browserMock)
     ;(utils.preparePuppeteer as jest.Mock).mockResolvedValue('/chrome')

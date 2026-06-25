@@ -56,6 +56,10 @@ inputs:
     required: false
     default: 2097152
 
+outputs:
+  refreshed-cookie:
+    description: 'Cookie _t forum.cfx.re après connexion au portal (à persister dans FORUM_COOKIE)'
+
 runs:
   using: node24
   main: dist/index.mjs
