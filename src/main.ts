@@ -19,8 +19,10 @@ import {
   getChangelog,
   getAssetVersions,
   deleteAssetVersion,
-  portalApiHeaders
+  portalApiHeaders,
+  clearFileCache
 } from './utils.js'
+import path from 'path'
 
 const NAVIGATION_TIMEOUT_MS = 60_000
 const PORTAL_ORIGIN = 'https://portal.cfx.re'
@@ -28,6 +30,8 @@ const EXPIRED_COOKIE_MESSAGE =
   'FORUM_COOKIE expiré ou invalide. Connectez-vous sur forum.cfx.re, copiez le cookie _t (DevTools → Application → Cookies), mettez à jour le secret GitHub FORUM_COOKIE, puis relancez le workflow « Escrow — refresh cookie ».'
 const PORTAL_API_UNAUTHORIZED =
   'Session portal API refusée (401). Mettez à jour FORUM_COOKIE (cookie _t sur forum.cfx.re), vérifiez que le compte forum a accès à portal.cfx.re / escrow, et que l\'asset existe (ex. atlas_blackout_dev).'
+const PORTAL_DUPLICATE_VERSION =
+  'Version déjà publiée sur le portal (409). Le fxmanifest git est en retard : alignez atlas/fxmanifest.lua sur la dernière version portal, committez, puis relancez le workflow.'
 
 async function gotoPage(
   page: Page,
@@ -183,26 +187,13 @@ export async function run(): Promise<void> {
       return
     }
 
-    const betaInput = core.getInput('beta').toLowerCase()
-    let beta = false
-
-    if (betaInput === 'true') {
-      beta = true
-    } else if (betaInput === 'false') {
-      beta = false
-    } else {
-      beta = await isBetaAsset(zipPath)
-    }
-
-    const changelog = await getChangelog(zipPath)
+    const versionInput = core.getInput('version').trim()
 
     // No asset id or name provided, using the repository name
     if (!assetId && !assetName) {
       core.debug('No asset id or name provided, using repository name...')
       assetName = basename(getEnv('GITHUB_WORKSPACE'))
     }
-
-    const version = await getFxManifestVersion(zipPath)
 
     await loginToPortal(browser, page, maxRetries)
     await publishRefreshedCookie(browser)
@@ -216,8 +207,29 @@ export async function run(): Promise<void> {
     }
 
     zipPath = await getZipPath(assetName, zipPath, makeZip)
+    const absoluteZipPath = path.resolve(zipPath)
+
+    clearFileCache()
+
+    const betaInput = core.getInput('beta').toLowerCase()
+    let beta = false
+
+    if (betaInput === 'true') {
+      beta = true
+    } else if (betaInput === 'false') {
+      beta = false
+    } else {
+      beta = await isBetaAsset(absoluteZipPath)
+    }
+
+    const changelog = await getChangelog(absoluteZipPath)
+    const version =
+      versionInput || (await getFxManifestVersion(absoluteZipPath))
+
+    core.info(`Version envoyée au portal : ${version}`)
+
     const uploadedVersionId = await uploadZip(
-      zipPath,
+      absoluteZipPath,
       assetId,
       chunkSize,
       cookies,
@@ -268,10 +280,17 @@ export async function run(): Promise<void> {
         core.error(`Response body: ${JSON.stringify(data, null, 2)}`)
       }
 
+      const duplicateVersion =
+        status === 409 &&
+        (data as { error_code?: string } | undefined)?.error_code ===
+          'DUPLICATE_VERSION'
+
       core.setFailed(
         status === 401
           ? PORTAL_API_UNAUTHORIZED
-          : data?.message || data?.errors || message || 'Unknown error'
+          : duplicateVersion
+            ? PORTAL_DUPLICATE_VERSION
+            : data?.message || data?.errors || message || 'Unknown error'
       )
     } else if (error instanceof Error) {
       if (error.message.includes('Navigation timeout')) {

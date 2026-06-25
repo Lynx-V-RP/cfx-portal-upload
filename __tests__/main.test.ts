@@ -42,6 +42,7 @@ registerCoreMock()
 registerAxiosMock()
 jest.unstable_mockModule('../src/utils.js', () => ({
   ...utilsMock,
+  clearFileCache: jest.fn(),
   portalApiHeaders: (cookies: string) => ({
     Cookie: cookies,
     Origin: 'https://portal.cfx.re',

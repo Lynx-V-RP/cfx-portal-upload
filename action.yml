@@ -25,6 +25,9 @@ inputs:
   zipPath:
     description: 'The path to the zip file to upload'
     required: false
+  version:
+    description: 'Version string sent to the portal (overrides fxmanifest.lua in the zip)'
+    required: false
   assetId:
     description: 'The asset id to re-upload'
     required: false

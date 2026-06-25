@@ -1000,14 +1000,14 @@ var require_util = __commonJS({
         }
         const port = url2.port != null ? url2.port : url2.protocol === "https:" ? 443 : 80;
         let origin2 = url2.origin != null ? url2.origin : `${url2.protocol}//${url2.hostname}:${port}`;
-        let path15 = url2.path != null ? url2.path : `${url2.pathname || ""}${url2.search || ""}`;
+        let path16 = url2.path != null ? url2.path : `${url2.pathname || ""}${url2.search || ""}`;
         if (origin2.endsWith("/")) {
           origin2 = origin2.substring(0, origin2.length - 1);
         }
-        if (path15 && !path15.startsWith("/")) {
-          path15 = `/${path15}`;
+        if (path16 && !path16.startsWith("/")) {
+          path16 = `/${path16}`;
         }
-        url2 = new URL(origin2 + path15);
+        url2 = new URL(origin2 + path16);
       }
       return url2;
     }
@@ -2621,20 +2621,20 @@ var require_parseParams = __commonJS({
 var require_basename = __commonJS({
   "node_modules/@fastify/busboy/lib/utils/basename.js"(exports, module) {
     "use strict";
-    module.exports = function basename4(path15) {
-      if (typeof path15 !== "string") {
+    module.exports = function basename4(path16) {
+      if (typeof path16 !== "string") {
         return "";
       }
-      for (var i = path15.length - 1; i >= 0; --i) {
-        switch (path15.charCodeAt(i)) {
+      for (var i = path16.length - 1; i >= 0; --i) {
+        switch (path16.charCodeAt(i)) {
           case 47:
           // '/'
           case 92:
-            path15 = path15.slice(i + 1);
-            return path15 === ".." || path15 === "." ? "" : path15;
+            path16 = path16.slice(i + 1);
+            return path16 === ".." || path16 === "." ? "" : path16;
         }
       }
-      return path15 === ".." || path15 === "." ? "" : path15;
+      return path16 === ".." || path16 === "." ? "" : path16;
     };
   }
 });
@@ -5664,7 +5664,7 @@ var require_request = __commonJS({
     }
     var Request3 = class _Request {
       constructor(origin2, {
-        path: path15,
+        path: path16,
         method,
         body,
         headers,
@@ -5678,11 +5678,11 @@ var require_request = __commonJS({
         throwOnError,
         expectContinue
       }, handler) {
-        if (typeof path15 !== "string") {
+        if (typeof path16 !== "string") {
           throw new InvalidArgumentError("path must be a string");
-        } else if (path15[0] !== "/" && !(path15.startsWith("http://") || path15.startsWith("https://")) && method !== "CONNECT") {
+        } else if (path16[0] !== "/" && !(path16.startsWith("http://") || path16.startsWith("https://")) && method !== "CONNECT") {
           throw new InvalidArgumentError("path must be an absolute URL or start with a slash");
-        } else if (invalidPathRegex.exec(path15) !== null) {
+        } else if (invalidPathRegex.exec(path16) !== null) {
           throw new InvalidArgumentError("invalid request path");
         }
         if (typeof method !== "string") {
@@ -5745,7 +5745,7 @@ var require_request = __commonJS({
         this.completed = false;
         this.aborted = false;
         this.upgrade = upgrade || null;
-        this.path = query ? util3.buildURL(path15, query) : path15;
+        this.path = query ? util3.buildURL(path16, query) : path16;
         this.origin = origin2;
         this.idempotent = idempotent == null ? method === "HEAD" || method === "GET" : idempotent;
         this.blocking = blocking == null ? false : blocking;
@@ -6753,9 +6753,9 @@ var require_RedirectHandler = __commonJS({
           return this.handler.onHeaders(statusCode, headers, resume, statusText);
         }
         const { origin: origin2, pathname, search } = util3.parseURL(new URL(this.location, this.opts.origin && new URL(this.opts.path, this.opts.origin)));
-        const path15 = search ? `${pathname}${search}` : pathname;
+        const path16 = search ? `${pathname}${search}` : pathname;
         this.opts.headers = cleanRequestHeaders(this.opts.headers, statusCode === 303, this.opts.origin !== origin2);
-        this.opts.path = path15;
+        this.opts.path = path16;
         this.opts.origin = origin2;
         this.opts.maxRedirections = 0;
         this.opts.query = null;
@@ -7995,7 +7995,7 @@ var require_client = __commonJS({
         writeH2(client, client[kHTTP2Session], request3);
         return;
       }
-      const { body, method, path: path15, host, upgrade, headers, blocking, reset } = request3;
+      const { body, method, path: path16, host, upgrade, headers, blocking, reset } = request3;
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body && typeof body.read === "function") {
         body.read(0);
@@ -8045,7 +8045,7 @@ var require_client = __commonJS({
       if (blocking) {
         socket[kBlocking] = true;
       }
-      let header = `${method} ${path15} HTTP/1.1\r
+      let header = `${method} ${path16} HTTP/1.1\r
 `;
       if (typeof host === "string") {
         header += `host: ${host}\r
@@ -8108,7 +8108,7 @@ upgrade: ${upgrade}\r
       return true;
     }
     function writeH2(client, session, request3) {
-      const { body, method, path: path15, host, upgrade, expectContinue, signal, headers: reqHeaders } = request3;
+      const { body, method, path: path16, host, upgrade, expectContinue, signal, headers: reqHeaders } = request3;
       let headers;
       if (typeof reqHeaders === "string") headers = Request3[kHTTP2CopyHeaders](reqHeaders.trim());
       else headers = reqHeaders;
@@ -8151,7 +8151,7 @@ upgrade: ${upgrade}\r
         });
         return true;
       }
-      headers[HTTP2_HEADER_PATH] = path15;
+      headers[HTTP2_HEADER_PATH] = path16;
       headers[HTTP2_HEADER_SCHEME] = "https";
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body && typeof body.read === "function") {
@@ -10383,20 +10383,20 @@ var require_mock_utils = __commonJS({
       }
       return true;
     }
-    function safeUrl(path15) {
-      if (typeof path15 !== "string") {
-        return path15;
+    function safeUrl(path16) {
+      if (typeof path16 !== "string") {
+        return path16;
       }
-      const pathSegments = path15.split("?");
+      const pathSegments = path16.split("?");
       if (pathSegments.length !== 2) {
-        return path15;
+        return path16;
       }
       const qp = new URLSearchParams(pathSegments.pop());
       qp.sort();
       return [...pathSegments, qp.toString()].join("?");
     }
-    function matchKey(mockDispatch2, { path: path15, method, body, headers }) {
-      const pathMatch = matchValue(mockDispatch2.path, path15);
+    function matchKey(mockDispatch2, { path: path16, method, body, headers }) {
+      const pathMatch = matchValue(mockDispatch2.path, path16);
       const methodMatch = matchValue(mockDispatch2.method, method);
       const bodyMatch = typeof mockDispatch2.body !== "undefined" ? matchValue(mockDispatch2.body, body) : true;
       const headersMatch = matchHeaders(mockDispatch2, headers);
@@ -10414,7 +10414,7 @@ var require_mock_utils = __commonJS({
     function getMockDispatch(mockDispatches, key) {
       const basePath = key.query ? buildURL2(key.path, key.query) : key.path;
       const resolvedPath = typeof basePath === "string" ? safeUrl(basePath) : basePath;
-      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path15 }) => matchValue(safeUrl(path15), resolvedPath));
+      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path16 }) => matchValue(safeUrl(path16), resolvedPath));
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for path '${resolvedPath}'`);
       }
@@ -10451,9 +10451,9 @@ var require_mock_utils = __commonJS({
       }
     }
     function buildKey(opts) {
-      const { path: path15, method, body, headers, query } = opts;
+      const { path: path16, method, body, headers, query } = opts;
       return {
-        path: path15,
+        path: path16,
         method,
         body,
         headers,
@@ -10902,10 +10902,10 @@ var require_pending_interceptors_formatter = __commonJS({
       }
       format(pendingInterceptors) {
         const withPrettyHeaders = pendingInterceptors.map(
-          ({ method, path: path15, data: { statusCode }, persist, times: times2, timesInvoked, origin: origin2 }) => ({
+          ({ method, path: path16, data: { statusCode }, persist, times: times2, timesInvoked, origin: origin2 }) => ({
             Method: method,
             Origin: origin2,
-            Path: path15,
+            Path: path16,
             "Status code": statusCode,
             Persistent: persist ? "\u2705" : "\u274C",
             Invocations: timesInvoked,
@@ -15523,8 +15523,8 @@ var require_util6 = __commonJS({
         }
       }
     }
-    function validateCookiePath(path15) {
-      for (const char of path15) {
+    function validateCookiePath(path16) {
+      for (const char of path16) {
         const code = char.charCodeAt(0);
         if (code < 33 || char === ";") {
           throw new Error("Invalid cookie path");
@@ -17216,11 +17216,11 @@ var require_undici = __commonJS({
           if (typeof opts.path !== "string") {
             throw new InvalidArgumentError("invalid opts.path");
           }
-          let path15 = opts.path;
+          let path16 = opts.path;
           if (!opts.path.startsWith("/")) {
-            path15 = `/${path15}`;
+            path16 = `/${path16}`;
           }
-          url2 = new URL(util3.parseOrigin(url2).origin + path15);
+          url2 = new URL(util3.parseOrigin(url2).origin + path16);
         } else {
           if (!opts) {
             opts = typeof url2 === "object" ? url2 : {};
@@ -18446,7 +18446,7 @@ var require_path_utils = __commonJS({
     };
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.toPlatformPath = exports.toWin32Path = exports.toPosixPath = void 0;
-    var path15 = __importStar(__require("path"));
+    var path16 = __importStar(__require("path"));
     function toPosixPath(pth) {
       return pth.replace(/[\\]/g, "/");
     }
@@ -18456,7 +18456,7 @@ var require_path_utils = __commonJS({
     }
     exports.toWin32Path = toWin32Path;
     function toPlatformPath(pth) {
-      return pth.replace(/[/\\]/g, path15.sep);
+      return pth.replace(/[/\\]/g, path16.sep);
     }
     exports.toPlatformPath = toPlatformPath;
   }
@@ -18520,7 +18520,7 @@ var require_io_util = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getCmdPath = exports.tryGetExecutablePath = exports.isRooted = exports.isDirectory = exports.exists = exports.READONLY = exports.UV_FS_O_EXLOCK = exports.IS_WINDOWS = exports.unlink = exports.symlink = exports.stat = exports.rmdir = exports.rm = exports.rename = exports.readlink = exports.readdir = exports.open = exports.mkdir = exports.lstat = exports.copyFile = exports.chmod = void 0;
     var fs10 = __importStar(__require("fs"));
-    var path15 = __importStar(__require("path"));
+    var path16 = __importStar(__require("path"));
     _a10 = fs10.promises, exports.chmod = _a10.chmod, exports.copyFile = _a10.copyFile, exports.lstat = _a10.lstat, exports.mkdir = _a10.mkdir, exports.open = _a10.open, exports.readdir = _a10.readdir, exports.readlink = _a10.readlink, exports.rename = _a10.rename, exports.rm = _a10.rm, exports.rmdir = _a10.rmdir, exports.stat = _a10.stat, exports.symlink = _a10.symlink, exports.unlink = _a10.unlink;
     exports.IS_WINDOWS = process.platform === "win32";
     exports.UV_FS_O_EXLOCK = 268435456;
@@ -18569,7 +18569,7 @@ var require_io_util = __commonJS({
         }
         if (stats && stats.isFile()) {
           if (exports.IS_WINDOWS) {
-            const upperExt = path15.extname(filePath).toUpperCase();
+            const upperExt = path16.extname(filePath).toUpperCase();
             if (extensions.some((validExt) => validExt.toUpperCase() === upperExt)) {
               return filePath;
             }
@@ -18593,11 +18593,11 @@ var require_io_util = __commonJS({
           if (stats && stats.isFile()) {
             if (exports.IS_WINDOWS) {
               try {
-                const directory = path15.dirname(filePath);
-                const upperName = path15.basename(filePath).toUpperCase();
+                const directory = path16.dirname(filePath);
+                const upperName = path16.basename(filePath).toUpperCase();
                 for (const actualName of yield exports.readdir(directory)) {
                   if (upperName === actualName.toUpperCase()) {
-                    filePath = path15.join(directory, actualName);
+                    filePath = path16.join(directory, actualName);
                     break;
                   }
                 }
@@ -18692,7 +18692,7 @@ var require_io = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.findInPath = exports.which = exports.mkdirP = exports.rmRF = exports.mv = exports.cp = void 0;
     var assert_1 = __require("assert");
-    var path15 = __importStar(__require("path"));
+    var path16 = __importStar(__require("path"));
     var ioUtil = __importStar(require_io_util());
     function cp(source2, dest, options2 = {}) {
       return __awaiter2(this, void 0, void 0, function* () {
@@ -18701,7 +18701,7 @@ var require_io = __commonJS({
         if (destStat && destStat.isFile() && !force) {
           return;
         }
-        const newDest = destStat && destStat.isDirectory() && copySourceDirectory ? path15.join(dest, path15.basename(source2)) : dest;
+        const newDest = destStat && destStat.isDirectory() && copySourceDirectory ? path16.join(dest, path16.basename(source2)) : dest;
         if (!(yield ioUtil.exists(source2))) {
           throw new Error(`no such file or directory: ${source2}`);
         }
@@ -18713,7 +18713,7 @@ var require_io = __commonJS({
             yield cpDirRecursive(source2, newDest, 0, force);
           }
         } else {
-          if (path15.relative(source2, newDest) === "") {
+          if (path16.relative(source2, newDest) === "") {
             throw new Error(`'${newDest}' and '${source2}' are the same file`);
           }
           yield copyFile(source2, newDest, force);
@@ -18726,7 +18726,7 @@ var require_io = __commonJS({
         if (yield ioUtil.exists(dest)) {
           let destExists = true;
           if (yield ioUtil.isDirectory(dest)) {
-            dest = path15.join(dest, path15.basename(source2));
+            dest = path16.join(dest, path16.basename(source2));
             destExists = yield ioUtil.exists(dest);
           }
           if (destExists) {
@@ -18737,7 +18737,7 @@ var require_io = __commonJS({
             }
           }
         }
-        yield mkdirP(path15.dirname(dest));
+        yield mkdirP(path16.dirname(dest));
         yield ioUtil.rename(source2, dest);
       });
     }
@@ -18800,7 +18800,7 @@ var require_io = __commonJS({
         }
         const extensions = [];
         if (ioUtil.IS_WINDOWS && process.env["PATHEXT"]) {
-          for (const extension2 of process.env["PATHEXT"].split(path15.delimiter)) {
+          for (const extension2 of process.env["PATHEXT"].split(path16.delimiter)) {
             if (extension2) {
               extensions.push(extension2);
             }
@@ -18813,12 +18813,12 @@ var require_io = __commonJS({
           }
           return [];
         }
-        if (tool.includes(path15.sep)) {
+        if (tool.includes(path16.sep)) {
           return [];
         }
         const directories = [];
         if (process.env.PATH) {
-          for (const p of process.env.PATH.split(path15.delimiter)) {
+          for (const p of process.env.PATH.split(path16.delimiter)) {
             if (p) {
               directories.push(p);
             }
@@ -18826,7 +18826,7 @@ var require_io = __commonJS({
         }
         const matches = [];
         for (const directory of directories) {
-          const filePath = yield ioUtil.tryGetExecutablePath(path15.join(directory, tool), extensions);
+          const filePath = yield ioUtil.tryGetExecutablePath(path16.join(directory, tool), extensions);
           if (filePath) {
             matches.push(filePath);
           }
@@ -18942,7 +18942,7 @@ var require_toolrunner = __commonJS({
     var os10 = __importStar(__require("os"));
     var events = __importStar(__require("events"));
     var child = __importStar(__require("child_process"));
-    var path15 = __importStar(__require("path"));
+    var path16 = __importStar(__require("path"));
     var io = __importStar(require_io());
     var ioUtil = __importStar(require_io_util());
     var timers_1 = __require("timers");
@@ -19157,7 +19157,7 @@ var require_toolrunner = __commonJS({
       exec() {
         return __awaiter2(this, void 0, void 0, function* () {
           if (!ioUtil.isRooted(this.toolPath) && (this.toolPath.includes("/") || IS_WINDOWS && this.toolPath.includes("\\"))) {
-            this.toolPath = path15.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
+            this.toolPath = path16.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
           }
           this.toolPath = yield io.which(this.toolPath, true);
           return new Promise((resolve7, reject) => __awaiter2(this, void 0, void 0, function* () {
@@ -19657,7 +19657,7 @@ var require_core = __commonJS({
     var file_command_1 = require_file_command();
     var utils_1 = require_utils();
     var os10 = __importStar(__require("os"));
-    var path15 = __importStar(__require("path"));
+    var path16 = __importStar(__require("path"));
     var oidc_utils_1 = require_oidc_utils();
     var ExitCode;
     (function(ExitCode2) {
@@ -19685,7 +19685,7 @@ var require_core = __commonJS({
       } else {
         (0, command_1.issueCommand)("add-path", {}, inputPath);
       }
-      process.env["PATH"] = `${inputPath}${path15.delimiter}${process.env["PATH"]}`;
+      process.env["PATH"] = `${inputPath}${path16.delimiter}${process.env["PATH"]}`;
     }
     exports.addPath = addPath;
     function getInput3(name, options2) {
@@ -22718,11 +22718,11 @@ function evaluationString(fun, ...args) {
   }
   return `(${fun})(${args.map(serializeArgument).join(",")})`;
 }
-async function getReadableAsTypedArray(readable, path15) {
+async function getReadableAsTypedArray(readable, path16) {
   const buffers = [];
   const reader = readable.getReader();
-  if (path15) {
-    const fileHandle = await environment.value.fs.promises.open(path15, "w+");
+  if (path16) {
+    const fileHandle = await environment.value.fs.promises.open(path16, "w+");
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -27265,14 +27265,14 @@ var init_Extension = __esm({
       /**
        * @internal
        */
-      constructor(id, version, name, path15, enabled) {
+      constructor(id, version, name, path16, enabled) {
         if (!id || !version) {
           throw new Error("Extension ID and version are required");
         }
         this.#id = id;
         this.#version = version;
         this.#name = name;
-        this.#path = path15;
+        this.#path = path16;
         this.#enabled = enabled;
       }
       /**
@@ -27893,13 +27893,13 @@ var init_Frame = __esm({
          */
         async addScriptTag(options2) {
           let { content = "", type } = options2;
-          const { path: path15 } = options2;
-          if (+!!options2.url + +!!path15 + +!!content !== 1) {
+          const { path: path16 } = options2;
+          if (+!!options2.url + +!!path16 + +!!content !== 1) {
             throw new Error("Exactly one of `url`, `path`, or `content` must be specified.");
           }
-          if (path15) {
-            content = await environment.value.fs.promises.readFile(path15, "utf8");
-            content += `//# sourceURL=${path15.replace(/\n/g, "")}`;
+          if (path16) {
+            content = await environment.value.fs.promises.readFile(path16, "utf8");
+            content += `//# sourceURL=${path16.replace(/\n/g, "")}`;
           }
           type = type ?? "text/javascript";
           return await this.mainRealm().transferHandle(await this.isolatedRealm().evaluateHandle(async ({ url: url2, id, type: type2, content: content2 }) => {
@@ -27931,13 +27931,13 @@ var init_Frame = __esm({
          */
         async addStyleTag(options2) {
           let { content = "" } = options2;
-          const { path: path15 } = options2;
-          if (+!!options2.url + +!!path15 + +!!content !== 1) {
+          const { path: path16 } = options2;
+          if (+!!options2.url + +!!path16 + +!!content !== 1) {
             throw new Error("Exactly one of `url`, `path`, or `content` must be specified.");
           }
-          if (path15) {
-            content = await environment.value.fs.promises.readFile(path15, "utf8");
-            content += "/*# sourceURL=" + path15.replace(/\n/g, "") + "*/";
+          if (path16) {
+            content = await environment.value.fs.promises.readFile(path16, "utf8");
+            content += "/*# sourceURL=" + path16.replace(/\n/g, "") + "*/";
             options2.content = content;
           }
           return await this.mainRealm().transferHandle(await this.isolatedRealm().evaluateHandle(async ({ url: url2, content: content2 }) => {
@@ -29586,11 +29586,11 @@ var init_Page = __esm({
         /**
          * @internal
          */
-        async _maybeWriteTypedArrayToFile(path15, typedArray) {
-          if (!path15) {
+        async _maybeWriteTypedArrayToFile(path16, typedArray) {
+          if (!path16) {
             return;
           }
-          await environment.value.fs.promises.writeFile(path15, typedArray);
+          await environment.value.fs.promises.writeFile(path16, typedArray);
         }
         /**
          * Captures a screencast of this {@link Page | page}.
@@ -33361,13 +33361,13 @@ var init_ElementHandle2 = __esm({
             return element.multiple;
           });
           assert(files.length <= 1 || isMultiple, "Multiple file uploads only work with <input type=file multiple>");
-          const path15 = environment.value.path;
-          if (path15) {
+          const path16 = environment.value.path;
+          if (path16) {
             files = files.map((filePath) => {
-              if (path15.win32.isAbsolute(filePath) || path15.posix.isAbsolute(filePath)) {
+              if (path16.win32.isAbsolute(filePath) || path16.posix.isAbsolute(filePath)) {
                 return filePath;
               } else {
-                return path15.resolve(filePath);
+                return path16.resolve(filePath);
               }
             });
           }
@@ -37162,7 +37162,7 @@ var init_Tracing = __esm({
           "disabled-by-default-devtools.timeline.stack",
           "disabled-by-default-v8.cpu_profiler"
         ];
-        const { path: path15, screenshots = false, categories = defaultCategories } = options2;
+        const { path: path16, screenshots = false, categories = defaultCategories } = options2;
         if (screenshots) {
           categories.push("disabled-by-default-devtools.screenshot");
         }
@@ -37174,7 +37174,7 @@ var init_Tracing = __esm({
         const includedCategories = categories.filter((cat) => {
           return !cat.startsWith("-");
         });
-        this.#path = path15;
+        this.#path = path16;
         this.#recording = true;
         await this.#client.send("Tracing.start", {
           transferMode: "ReturnAsStream",
@@ -38358,9 +38358,9 @@ var init_Page2 = __esm({
         return await getReadableFromProtocolStream(this.#primaryTargetClient, result.stream);
       }
       async pdf(options2 = {}) {
-        const { path: path15 = void 0 } = options2;
+        const { path: path16 = void 0 } = options2;
         const readable = await this.createPDFStream(options2);
-        const typedArray = await getReadableAsTypedArray(readable, path15);
+        const typedArray = await getReadableAsTypedArray(readable, path16);
         assert(typedArray, "Could not create typed array");
         return typedArray;
       }
@@ -38643,8 +38643,8 @@ var init_Extension2 = __esm({
       /*
        * @internal
        */
-      constructor(id, version, name, path15, enabled, browser) {
-        super(id, version, name, path15, enabled);
+      constructor(id, version, name, path16, enabled, browser) {
+        super(id, version, name, path16, enabled);
         this.#browser = browser;
       }
       async workers() {
@@ -40343,8 +40343,8 @@ var init_Browser2 = __esm({
         });
         return response.targetId;
       }
-      async installExtension(path15) {
-        const { id } = await this.#connection.send("Extensions.loadUnpacked", { path: path15 });
+      async installExtension(path16) {
+        const { id } = await this.#connection.send("Extensions.loadUnpacked", { path: path16 });
         this.#extensions.delete(id);
         return id;
       }
@@ -45579,16 +45579,16 @@ var init_InputProcessor = __esm({
           }
           const { handle } = result2.result;
           assert2(handle !== void 0);
-          const { path: path15 } = await hiddenSandboxRealm.cdpClient.sendCommand("DOM.getFileInfo", {
+          const { path: path16 } = await hiddenSandboxRealm.cdpClient.sendCommand("DOM.getFileInfo", {
             objectId: handle
           });
-          paths.push(path15);
+          paths.push(path16);
           void hiddenSandboxRealm.disown(handle).catch(void 0);
         }
         paths.sort();
         const sortedFiles = [...params.files].sort();
-        if (paths.length !== params.files.length || sortedFiles.some((path15, index) => {
-          return paths[index] !== path15;
+        if (paths.length !== params.files.length || sortedFiles.some((path16, index) => {
+          return paths[index] !== path16;
         })) {
           const { objectId } = await hiddenSandboxRealm.deserializeForCdp(params.element);
           assert2(objectId !== void 0);
@@ -56194,13 +56194,13 @@ var init_ElementHandle3 = __esm({
           }
         }
         async uploadFile(...files) {
-          const path15 = environment.value.path;
-          if (path15) {
+          const path16 = environment.value.path;
+          if (path16) {
             files = files.map((file) => {
-              if (path15.win32.isAbsolute(file) || path15.posix.isAbsolute(file)) {
+              if (path16.win32.isAbsolute(file) || path16.posix.isAbsolute(file)) {
                 return file;
               } else {
-                return path15.resolve(file);
+                return path16.resolve(file);
               }
             });
           }
@@ -59109,7 +59109,7 @@ var init_Page3 = __esm({
           return this.#viewport;
         }
         async pdf(options2 = {}) {
-          const { timeout: ms = this._timeoutSettings.timeout(), path: path15 = void 0 } = options2;
+          const { timeout: ms = this._timeoutSettings.timeout(), path: path16 = void 0 } = options2;
           const { printBackground: background, margin, landscape, width, height, pageRanges: ranges, scale, preferCSSPageSize } = parsePDFOptions(options2, "cm");
           const pageRanges = ranges ? ranges.split(", ") : [];
           await firstValueFrom(from(this.mainFrame().isolatedRealm().evaluate(() => {
@@ -59128,7 +59128,7 @@ var init_Page3 = __esm({
             shrinkToFit: !preferCSSPageSize
           })).pipe(raceWith(timeout(ms))));
           const typedArray = stringToTypedArray(data, true);
-          await this._maybeWriteTypedArrayToFile(path15, typedArray);
+          await this._maybeWriteTypedArrayToFile(path16, typedArray);
           return typedArray;
         }
         async createPDFStream(options2) {
@@ -60264,9 +60264,9 @@ var init_Browser3 = __esm({
           }
           return this.#createUserContext(userContext);
         }
-        async installExtension(path15) {
+        async installExtension(path16) {
           const { result: { extension: extension2 } } = await this.session.send("webExtension.install", {
-            extensionData: { type: "path", path: path15 }
+            extensionData: { type: "path", path: path16 }
           });
           return extension2;
         }
@@ -60753,8 +60753,8 @@ var init_Browser4 = __esm({
         newPage(options2) {
           return this.defaultBrowserContext().newPage(options2);
         }
-        installExtension(path15) {
-          return this.#browserCore.installExtension(path15);
+        installExtension(path16) {
+          return this.#browserCore.installExtension(path16);
         }
         async uninstallExtension(id) {
           await this.#browserCore.uninstallExtension(id);
@@ -64985,8 +64985,8 @@ function getWslLocation(channel) {
     }
   }
   const windowsPath = getChromeWindowsLocation(channel, wslPrefixes);
-  return windowsPath.map((path15) => {
-    return execSync(`wslpath "${path15}"`).toString().trim();
+  return windowsPath.map((path16) => {
+    return execSync(`wslpath "${path16}"`).toString().trim();
   });
 }
 function getChromeLinuxOrWslLocation(channel) {
@@ -66093,16 +66093,16 @@ function computeSystemExecutablePath(options2) {
     throw new Error(`Cannot download a binary for the provided platform: ${os4.platform()} (${os4.arch()})`);
   }
   const paths = resolveSystemExecutablePaths2(options2.browser, options2.platform, options2.channel);
-  for (const path15 of paths) {
+  for (const path16 of paths) {
     try {
-      accessSync(path15);
-      return path15;
+      accessSync(path16);
+      return path16;
     } catch {
     }
   }
-  throw new Error(`Could not find Google Chrome executable for channel '${options2.channel}' at:${paths.map((path15) => {
+  throw new Error(`Could not find Google Chrome executable for channel '${options2.channel}' at:${paths.map((path16) => {
     return `
- - ${path15}`;
+ - ${path16}`;
   })}.`);
 }
 function launch(opts) {
@@ -66584,13 +66584,13 @@ function generatePax(header) {
     paxBody
   };
 }
-function findUstarSplit(path15) {
-  const totalPathBytes = encoder.encode(path15).length;
+function findUstarSplit(path16) {
+  const totalPathBytes = encoder.encode(path16).length;
   if (totalPathBytes <= 100 || totalPathBytes > USTAR_SPLIT_MAX_SIZE) return null;
-  for (let i = path15.length - 1; i > 0; i--) {
-    if (path15[i] !== "/") continue;
-    const prefix = path15.slice(0, i);
-    const name = path15.slice(i + 1);
+  for (let i = path16.length - 1; i > 0; i--) {
+    if (path16[i] !== "/") continue;
+    const prefix = path16.slice(0, i);
+    const name = path16.slice(i + 1);
     if (encoder.encode(prefix).length <= 155 && encoder.encode(name).length <= 100) return {
       prefix,
       name
@@ -67111,9 +67111,9 @@ function validateBounds(targetPath, destDir, errorMessage) {
   if (target !== dest && !target.startsWith(dest + path7.sep)) throw new Error(errorMessage);
 }
 function normalizeName(name) {
-  const path15 = name.replace(/\\/g, "/");
-  if (path15.split("/").includes("..") || /^[a-zA-Z]:\.\./.test(path15)) throw new Error(`${name} points outside extraction directory`);
-  let relative2 = path15;
+  const path16 = name.replace(/\\/g, "/");
+  if (path16.split("/").includes("..") || /^[a-zA-Z]:\.\./.test(path16)) throw new Error(`${name} points outside extraction directory`);
+  let relative2 = path16;
   if (/^[a-zA-Z]:/.test(relative2)) relative2 = relative2.replace(/^[a-zA-Z]:[/\\]?/, "");
   else if (relative2.startsWith("/")) relative2 = relative2.replace(/^\/+/, "");
   if (process.platform === "win32") return relative2.replace(/[<>:"|?*]/g, (char) => win32Reserved[char]);
@@ -67318,7 +67318,7 @@ function packTar(sources, options2 = {}) {
   })().catch((error2) => stream4.destroy(error2));
   return stream4;
 }
-function createFileSink(path15, { mode = 438, mtime } = {}) {
+function createFileSink(path16, { mode = 438, mtime } = {}) {
   let state = STATE_UNOPENED;
   let flushing = false;
   let fd = null;
@@ -67412,7 +67412,7 @@ function createFileSink(path15, { mode = 438, mtime } = {}) {
   const open3 = () => {
     if (state !== STATE_UNOPENED) return;
     state = STATE_OPENING;
-    fs3.open(path15, OPEN_FLAGS, mode, (err, openFd) => {
+    fs3.open(path16, OPEN_FLAGS, mode, (err, openFd) => {
       if (err) return fail(err);
       if (state === STATE_CLOSED || state === STATE_FAILED) {
         fs3.close(openFd);
@@ -69736,11 +69736,11 @@ var init_lib2 = __esm({
       resolve: resolve4,
       // TODO: figure  out a  way to combine ESM and CJS coverage, such  that
       // we can exercise all the lines below:
-      require: (path15) => {
+      require: (path16) => {
         if (typeof __require !== "undefined") {
-          return __require(path15);
-        } else if (path15.match(/\.json$/)) {
-          return JSON.parse(readFileSync2(path15, "utf8"));
+          return __require(path16);
+        } else if (path16.match(/\.json$/)) {
+          return JSON.parse(readFileSync2(path16, "utf8"));
         } else {
           throw Error("only .json config files are supported in ESM");
         }
@@ -74155,7 +74155,7 @@ var init_index_browser = __esm({
 // node_modules/lilconfig/src/index.js
 var require_src = __commonJS({
   "node_modules/lilconfig/src/index.js"(exports, module) {
-    var path15 = __require("path");
+    var path16 = __require("path");
     var fs10 = __require("fs");
     var os10 = __require("os");
     var url2 = __require("url");
@@ -74178,7 +74178,7 @@ var require_src = __commonJS({
       ];
     }
     function parentDir(p) {
-      return path15.dirname(p) || path15.sep;
+      return path16.dirname(p) || path16.sep;
     }
     var jsonLoader = (_2, content) => JSON.parse(content);
     var requireFunc = typeof __webpack_require__ === "function" ? __non_webpack_require__ : __require;
@@ -74231,7 +74231,7 @@ var require_src = __commonJS({
         }
       };
       conf.searchPlaces.forEach((place) => {
-        const key = path15.extname(place) || "noExt";
+        const key = path16.extname(place) || "noExt";
         const loader = conf.loaders[key];
         if (!loader) {
           throw new Error(`Missing loader for extension "${place}"`);
@@ -74293,14 +74293,14 @@ var require_src = __commonJS({
               visited.add(dir);
             }
             for (const searchPlace of searchPlaces) {
-              const filepath = path15.join(dir, searchPlace);
+              const filepath = path16.join(dir, searchPlace);
               try {
                 await fs10.promises.access(filepath);
               } catch {
                 continue;
               }
               const content = String(await fsReadFileAsync(filepath));
-              const loaderKey = path15.extname(searchPlace) || "noExt";
+              const loaderKey = path16.extname(searchPlace) || "noExt";
               const loader = loaders[loaderKey];
               if (searchPlace === "package.json") {
                 const pkg = await loader(filepath, content);
@@ -74338,11 +74338,11 @@ var require_src = __commonJS({
         },
         async load(filepath) {
           validateFilePath(filepath);
-          const absPath = path15.resolve(process.cwd(), filepath);
+          const absPath = path16.resolve(process.cwd(), filepath);
           if (cache && loadCache.has(absPath)) {
             return loadCache.get(absPath);
           }
-          const { base, ext } = path15.parse(absPath);
+          const { base, ext } = path16.parse(absPath);
           const loaderKey = ext || "noExt";
           const loader = loaders[loaderKey];
           validateLoader(loader, loaderKey);
@@ -74425,13 +74425,13 @@ var require_src = __commonJS({
               visited.add(dir);
             }
             for (const searchPlace of searchPlaces) {
-              const filepath = path15.join(dir, searchPlace);
+              const filepath = path16.join(dir, searchPlace);
               try {
                 fs10.accessSync(filepath);
               } catch {
                 continue;
               }
-              const loaderKey = path15.extname(searchPlace) || "noExt";
+              const loaderKey = path16.extname(searchPlace) || "noExt";
               const loader = loaders[loaderKey];
               const content = String(fs10.readFileSync(filepath));
               if (searchPlace === "package.json") {
@@ -74470,11 +74470,11 @@ var require_src = __commonJS({
         },
         load(filepath) {
           validateFilePath(filepath);
-          const absPath = path15.resolve(process.cwd(), filepath);
+          const absPath = path16.resolve(process.cwd(), filepath);
           if (cache && loadCache.has(absPath)) {
             return loadCache.get(absPath);
           }
-          const { base, ext } = path15.parse(absPath);
+          const { base, ext } = path16.parse(absPath);
           const loaderKey = ext || "noExt";
           const loader = loaders[loaderKey];
           validateLoader(loader, loaderKey);
@@ -83372,11 +83372,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path15) {
-      if (!path15 || typeof path15 !== "string") {
+    function lookup(path16) {
+      if (!path16 || typeof path16 !== "string") {
         return false;
       }
-      var extension3 = extname2("x." + path15).toLowerCase().substr(1);
+      var extension3 = extname2("x." + path16).toLowerCase().substr(1);
       if (!extension3) {
         return false;
       }
@@ -83633,7 +83633,7 @@ var require_form_data = __commonJS({
   "node_modules/form-data/lib/form_data.js"(exports, module) {
     var CombinedStream = require_combined_stream();
     var util3 = __require("util");
-    var path15 = __require("path");
+    var path16 = __require("path");
     var http3 = __require("http");
     var https3 = __require("https");
     var parseUrl = __require("url").parse;
@@ -83759,11 +83759,11 @@ var require_form_data = __commonJS({
     FormData4.prototype._getContentDisposition = function(value, options2) {
       var filename, contentDisposition;
       if (typeof options2.filepath === "string") {
-        filename = path15.normalize(options2.filepath).replace(/\\/g, "/");
+        filename = path16.normalize(options2.filepath).replace(/\\/g, "/");
       } else if (options2.filename || value.name || value.path) {
-        filename = path15.basename(options2.filename || value.name || value.path);
+        filename = path16.basename(options2.filename || value.name || value.path);
       } else if (value.readable && value.hasOwnProperty("httpVersion")) {
-        filename = path15.basename(value.client._httpMessage.path || "");
+        filename = path16.basename(value.client._httpMessage.path || "");
       }
       if (filename) {
         contentDisposition = 'filename="' + filename + '"';
@@ -86751,9 +86751,9 @@ var require_yauzl = __commonJS({
     exports.Entry = Entry;
     exports.LocalFileHeader = LocalFileHeader;
     exports.RandomAccessReader = RandomAccessReader;
-    function openPromise(path15, options2) {
+    function openPromise(path16, options2) {
       return new Promise((resolve7, reject) => {
-        open3(path15, { ...options2, lazyEntries: true }, function(err, zipfile) {
+        open3(path16, { ...options2, lazyEntries: true }, function(err, zipfile) {
           if (err) return reject(err);
           resolve7(zipfile);
         });
@@ -86783,7 +86783,7 @@ var require_yauzl = __commonJS({
         });
       });
     }
-    function open3(path15, options2, callback) {
+    function open3(path16, options2, callback) {
       if (typeof options2 === "function") {
         callback = options2;
         options2 = null;
@@ -86795,7 +86795,7 @@ var require_yauzl = __commonJS({
       if (options2.validateEntrySizes == null) options2.validateEntrySizes = true;
       if (options2.strictFileNames == null) options2.strictFileNames = false;
       if (callback == null) callback = defaultCallback;
-      fs10.open(path15, "r", function(err, fd) {
+      fs10.open(path16, "r", function(err, fd) {
         if (err) return callback(err);
         fromFd(fd, options2, function(err2, zipfile) {
           if (err2) fs10.close(fd, defaultCallback);
@@ -87809,8 +87809,8 @@ var BrowserLauncher = class {
         throw new Error("To use `enableExtensions` with a list of paths in Chrome, you must be connected with `--remote-debugging-pipe` (`pipe: true`).");
       }
       await Promise.all([
-        enableExtensions.map((path15) => {
-          return browser.installExtension(path15);
+        enableExtensions.map((path16) => {
+          return browser.installExtension(path16);
         })
       ]);
     }
@@ -87991,8 +87991,8 @@ var rmOptions = {
   recursive: true,
   maxRetries: 5
 };
-async function rm(path15) {
-  await fs5.promises.rm(path15, rmOptions);
+async function rm(path16) {
+  await fs5.promises.rm(path16, rmOptions);
 }
 
 // node_modules/puppeteer-core/lib/puppeteer/node/ChromeLauncher.js
@@ -88068,10 +88068,10 @@ var ChromeLauncher = class extends BrowserLauncher {
   /**
    * @internal
    */
-  async cleanUserDataDir(path15, opts) {
+  async cleanUserDataDir(path16, opts) {
     if (opts.isTemp) {
       try {
-        await rm(path15);
+        await rm(path16);
       } catch (error2) {
         debugError(error2);
         throw error2;
@@ -88663,7 +88663,7 @@ var ScreenRecorder = (() => {
     /**
      * @internal
      */
-    constructor(page, width, height, { ffmpegPath, speed, scale, crop, format: format3, fps, loop, delay, quality, colors, path: path15, overwrite } = {}) {
+    constructor(page, width, height, { ffmpegPath, speed, scale, crop, format: format3, fps, loop, delay, quality, colors, path: path16, overwrite } = {}) {
       super({ allowHalfOpen: false });
       ffmpegPath ??= "ffmpeg";
       format3 ??= "webm";
@@ -88696,8 +88696,8 @@ var ScreenRecorder = (() => {
       if (vf !== -1) {
         filters.push(formatArgs.splice(vf, 2).at(-1) ?? "");
       }
-      if (path15) {
-        fs7.mkdirSync(dirname4(path15), { recursive: overwrite });
+      if (path16) {
+        fs7.mkdirSync(dirname4(path16), { recursive: overwrite });
       }
       this.#process = spawn3(
         ffmpegPath,
@@ -89468,9 +89468,9 @@ function isVisitable(thing) {
 function removeBrackets(key) {
   return utils_default.endsWith(key, "[]") ? key.slice(0, -2) : key;
 }
-function renderKey(path15, key, dots) {
-  if (!path15) return key;
-  return path15.concat(key).map(function each(token, i) {
+function renderKey(path16, key, dots) {
+  if (!path16) return key;
+  return path16.concat(key).map(function each(token, i) {
     token = removeBrackets(token);
     return !dots && i ? "[" + token + "]" : token;
   }).join(dots ? "." : "");
@@ -89515,9 +89515,9 @@ function toFormData(obj, formData, options2) {
     }
     return value;
   }
-  function defaultVisitor(value, key, path15) {
+  function defaultVisitor(value, key, path16) {
     let arr = value;
-    if (value && !path15 && typeof value === "object") {
+    if (value && !path16 && typeof value === "object") {
       if (utils_default.endsWith(key, "{}")) {
         key = metaTokens ? key : key.slice(0, -2);
         value = JSON.stringify(value);
@@ -89536,7 +89536,7 @@ function toFormData(obj, formData, options2) {
     if (isVisitable(value)) {
       return true;
     }
-    formData.append(renderKey(path15, key, dots), convertValue(value));
+    formData.append(renderKey(path16, key, dots), convertValue(value));
     return false;
   }
   const stack = [];
@@ -89545,10 +89545,10 @@ function toFormData(obj, formData, options2) {
     convertValue,
     isVisitable
   });
-  function build(value, path15) {
+  function build(value, path16) {
     if (utils_default.isUndefined(value)) return;
     if (stack.indexOf(value) !== -1) {
-      throw Error("Circular reference detected in " + path15.join("."));
+      throw Error("Circular reference detected in " + path16.join("."));
     }
     stack.push(value);
     utils_default.forEach(value, function each(el, key) {
@@ -89556,11 +89556,11 @@ function toFormData(obj, formData, options2) {
         formData,
         el,
         utils_default.isString(key) ? key.trim() : key,
-        path15,
+        path16,
         exposedHelpers
       );
       if (result === true) {
-        build(el, path15 ? path15.concat(key) : [key]);
+        build(el, path16 ? path16.concat(key) : [key]);
       }
     });
     stack.pop();
@@ -89750,7 +89750,7 @@ var platform_default = {
 // node_modules/axios/lib/helpers/toURLEncodedForm.js
 function toURLEncodedForm(data, options2) {
   return toFormData_default(data, new platform_default.classes.URLSearchParams(), Object.assign({
-    visitor: function(value, key, path15, helpers) {
+    visitor: function(value, key, path16, helpers) {
       if (platform_default.isNode && utils_default.isBuffer(value)) {
         this.append(key, value.toString("base64"));
         return false;
@@ -89779,11 +89779,11 @@ function arrayToObject(arr) {
   return obj;
 }
 function formDataToJSON(formData) {
-  function buildPath(path15, value, target, index) {
-    let name = path15[index++];
+  function buildPath(path16, value, target, index) {
+    let name = path16[index++];
     if (name === "__proto__") return true;
     const isNumericKey = Number.isFinite(+name);
-    const isLast = index >= path15.length;
+    const isLast = index >= path16.length;
     name = !name && utils_default.isArray(target) ? target.length : name;
     if (isLast) {
       if (utils_default.hasOwnProp(target, name)) {
@@ -89796,7 +89796,7 @@ function formDataToJSON(formData) {
     if (!target[name] || !utils_default.isObject(target[name])) {
       target[name] = [];
     }
-    const result = buildPath(path15, value, target[name], index);
+    const result = buildPath(path16, value, target[name], index);
     if (result && utils_default.isArray(target[name])) {
       target[name] = arrayToObject(target[name]);
     }
@@ -90922,9 +90922,9 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config2) {
       auth = urlUsername + ":" + urlPassword;
     }
     auth && headers.delete("authorization");
-    let path15;
+    let path16;
     try {
-      path15 = buildURL(
+      path16 = buildURL(
         parsed.pathname + parsed.search,
         config2.params,
         config2.paramsSerializer
@@ -90942,7 +90942,7 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config2) {
       false
     );
     const options2 = {
-      path: path15,
+      path: path16,
       method,
       headers: headers.toJSON(),
       agents: { http: config2.httpAgent, https: config2.httpsAgent },
@@ -91172,10 +91172,10 @@ var isURLSameOrigin_default = platform_default.hasStandardBrowserEnv ? /* @__PUR
 var cookies_default = platform_default.hasStandardBrowserEnv ? (
   // Standard browser envs support document.cookie
   {
-    write(name, value, expires, path15, domain, secure) {
+    write(name, value, expires, path16, domain, secure) {
       const cookie = [name + "=" + encodeURIComponent(value)];
       utils_default.isNumber(expires) && cookie.push("expires=" + new Date(expires).toGMTString());
-      utils_default.isString(path15) && cookie.push("path=" + path15);
+      utils_default.isString(path16) && cookie.push("path=" + path16);
       utils_default.isString(domain) && cookie.push("domain=" + domain);
       secure === true && cookie.push("secure");
       document.cookie = cookie.join("; ");
@@ -92312,6 +92312,11 @@ var import_yauzl = __toESM(require_yauzl(), 1);
 import fs9 from "fs";
 import path14 from "path";
 var fileCache = {};
+function clearFileCache() {
+  for (const key in fileCache) {
+    delete fileCache[key];
+  }
+}
 async function readFileFromZip(zipPath, filePath, allowOneLevelDeeper = false) {
   return new Promise((resolve7, reject) => {
     core.debug(`Opening zip ${zipPath}..., looking for file ${filePath}`);
@@ -92586,10 +92591,12 @@ async function deleteAssetVersion(assetId, versionId, cookies) {
 }
 
 // src/main.ts
+import path15 from "path";
 var NAVIGATION_TIMEOUT_MS = 6e4;
 var PORTAL_ORIGIN = "https://portal.cfx.re";
 var EXPIRED_COOKIE_MESSAGE = "FORUM_COOKIE expir\xE9 ou invalide. Connectez-vous sur forum.cfx.re, copiez le cookie _t (DevTools \u2192 Application \u2192 Cookies), mettez \xE0 jour le secret GitHub FORUM_COOKIE, puis relancez le workflow \xAB Escrow \u2014 refresh cookie \xBB.";
 var PORTAL_API_UNAUTHORIZED = "Session portal API refus\xE9e (401). Mettez \xE0 jour FORUM_COOKIE (cookie _t sur forum.cfx.re), v\xE9rifiez que le compte forum a acc\xE8s \xE0 portal.cfx.re / escrow, et que l'asset existe (ex. atlas_blackout_dev).";
+var PORTAL_DUPLICATE_VERSION = "Version d\xE9j\xE0 publi\xE9e sur le portal (409). Le fxmanifest git est en retard : alignez atlas/fxmanifest.lua sur la derni\xE8re version portal, committez, puis relancez le workflow.";
 async function gotoPage(page, url2, waitUntil = "domcontentloaded") {
   page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS);
   await page.goto(url2, {
@@ -92701,21 +92708,11 @@ async function run() {
       core2.info("Skipping upload...");
       return;
     }
-    const betaInput = core2.getInput("beta").toLowerCase();
-    let beta = false;
-    if (betaInput === "true") {
-      beta = true;
-    } else if (betaInput === "false") {
-      beta = false;
-    } else {
-      beta = await isBetaAsset(zipPath);
-    }
-    const changelog = await getChangelog(zipPath);
+    const versionInput = core2.getInput("version").trim();
     if (!assetId && !assetName) {
       core2.debug("No asset id or name provided, using repository name...");
       assetName = basename3(getEnv("GITHUB_WORKSPACE"));
     }
-    const version = await getFxManifestVersion(zipPath);
     await loginToPortal(browser, page, maxRetries);
     await publishRefreshedCookie(browser);
     core2.info("Redirected to CFX Portal. Uploading file ...");
@@ -92725,8 +92722,22 @@ async function run() {
       assetId = await resolveAssetId(assetName, cookies);
     }
     zipPath = await getZipPath(assetName, zipPath, makeZip);
+    const absoluteZipPath = path15.resolve(zipPath);
+    clearFileCache();
+    const betaInput = core2.getInput("beta").toLowerCase();
+    let beta = false;
+    if (betaInput === "true") {
+      beta = true;
+    } else if (betaInput === "false") {
+      beta = false;
+    } else {
+      beta = await isBetaAsset(absoluteZipPath);
+    }
+    const changelog = await getChangelog(absoluteZipPath);
+    const version = versionInput || await getFxManifestVersion(absoluteZipPath);
+    core2.info(`Version envoy\xE9e au portal : ${version}`);
     const uploadedVersionId = await uploadZip(
-      zipPath,
+      absoluteZipPath,
       assetId,
       chunkSize,
       cookies,
@@ -92768,8 +92779,9 @@ async function run() {
       if (data) {
         core2.error(`Response body: ${JSON.stringify(data, null, 2)}`);
       }
+      const duplicateVersion = status === 409 && data?.error_code === "DUPLICATE_VERSION";
       core2.setFailed(
-        status === 401 ? PORTAL_API_UNAUTHORIZED : data?.message || data?.errors || message || "Unknown error"
+        status === 401 ? PORTAL_API_UNAUTHORIZED : duplicateVersion ? PORTAL_DUPLICATE_VERSION : data?.message || data?.errors || message || "Unknown error"
       );
     } else if (error2 instanceof Error) {
       if (error2.message.includes("Navigation timeout")) {
