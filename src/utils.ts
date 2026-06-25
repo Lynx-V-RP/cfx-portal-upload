@@ -167,6 +167,14 @@ export async function preparePuppeteer(): Promise<string | undefined> {
   return browser.executablePath
 }
 
+export function portalApiHeaders(cookies: string): Record<string, string> {
+  return {
+    Cookie: cookies,
+    Origin: 'https://portal.cfx.re',
+    Referer: 'https://portal.cfx.re/'
+  }
+}
+
 export async function resolveAssetId(
   name: string,
   cookies: string
@@ -176,9 +184,7 @@ export async function resolveAssetId(
   const search = await axios.get<SearchResponse>(
     `https://portal-api.cfx.re/v1/me/assets?search=${name}&sort=asset.name&direction=asc`,
     {
-      headers: {
-        Cookie: cookies
-      }
+      headers: portalApiHeaders(cookies)
     }
   )
 
@@ -411,9 +417,7 @@ export async function getAssetVersions(
   const response = await axios.get<AssetDetail>(
     getUrl('ASSET_DETAIL', { id: assetId }),
     {
-      headers: {
-        Cookie: cookies
-      }
+      headers: portalApiHeaders(cookies)
     }
   )
 
@@ -433,12 +437,7 @@ export async function deleteAssetVersion(
 ): Promise<void> {
   core.info(`Deleting version ${versionId} of asset ${assetId}...`)
 
-  await axios.delete(
-    getUrl('DELETE_VERSION', { id: assetId, version_id: versionId }),
-    {
-      headers: {
-        Cookie: cookies
-      }
-    }
-  )
+  await axios.delete(getUrl('DELETE_VERSION', { id: assetId, version_id: versionId }), {
+    headers: portalApiHeaders(cookies)
+  })
 }

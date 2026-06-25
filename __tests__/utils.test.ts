@@ -227,7 +227,11 @@ describe('utils', () => {
       expect(axios.get as jest.Mock).toHaveBeenCalledWith(
         expect.stringContaining('/assets/123'),
         expect.objectContaining({
-          headers: { Cookie: 'cookie' }
+          headers: {
+            Cookie: 'cookie',
+            Origin: 'https://portal.cfx.re',
+            Referer: 'https://portal.cfx.re/'
+          }
         })
       )
     })
@@ -240,7 +244,11 @@ describe('utils', () => {
       expect(axios.delete as jest.Mock).toHaveBeenCalledWith(
         expect.stringContaining('/assets/123/versions/456'),
         expect.objectContaining({
-          headers: { Cookie: 'cookie' }
+          headers: {
+            Cookie: 'cookie',
+            Origin: 'https://portal.cfx.re',
+            Referer: 'https://portal.cfx.re/'
+          }
         })
       )
     })

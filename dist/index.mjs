@@ -92403,14 +92403,19 @@ async function preparePuppeteer() {
   });
   return browser.executablePath;
 }
+function portalApiHeaders(cookies) {
+  return {
+    Cookie: cookies,
+    Origin: "https://portal.cfx.re",
+    Referer: "https://portal.cfx.re/"
+  };
+}
 async function resolveAssetId(name, cookies) {
   core.debug(`Searching asset id for ${name}...`);
   const search = await axios_default.get(
     `https://portal-api.cfx.re/v1/me/assets?search=${name}&sort=asset.name&direction=asc`,
     {
-      headers: {
-        Cookie: cookies
-      }
+      headers: portalApiHeaders(cookies)
     }
   );
   if (search.data.items.length == 0) {
@@ -92568,28 +92573,23 @@ async function getAssetVersions(assetId, cookies) {
   const response = await axios_default.get(
     getUrl("ASSET_DETAIL", { id: assetId }),
     {
-      headers: {
-        Cookie: cookies
-      }
+      headers: portalApiHeaders(cookies)
     }
   );
   return response.data.versions;
 }
 async function deleteAssetVersion(assetId, versionId, cookies) {
   core.info(`Deleting version ${versionId} of asset ${assetId}...`);
-  await axios_default.delete(
-    getUrl("DELETE_VERSION", { id: assetId, version_id: versionId }),
-    {
-      headers: {
-        Cookie: cookies
-      }
-    }
-  );
+  await axios_default.delete(getUrl("DELETE_VERSION", { id: assetId, version_id: versionId }), {
+    headers: portalApiHeaders(cookies)
+  });
 }
 
 // src/main.ts
 var NAVIGATION_TIMEOUT_MS = 6e4;
+var PORTAL_ORIGIN = "https://portal.cfx.re";
 var EXPIRED_COOKIE_MESSAGE = "FORUM_COOKIE expir\xE9 ou invalide. Connectez-vous sur forum.cfx.re, copiez le cookie _t (DevTools \u2192 Application \u2192 Cookies), mettez \xE0 jour le secret GitHub FORUM_COOKIE, puis relancez le workflow \xAB Escrow \u2014 refresh cookie \xBB.";
+var PORTAL_API_UNAUTHORIZED = "Session portal API refus\xE9e (401). Mettez \xE0 jour FORUM_COOKIE (cookie _t sur forum.cfx.re), v\xE9rifiez que le compte forum a acc\xE8s \xE0 portal.cfx.re / escrow, et que l'asset existe (ex. atlas_blackout_dev).";
 async function gotoPage(page, url2, waitUntil = "domcontentloaded") {
   page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS);
   await page.goto(url2, {
@@ -92607,6 +92607,55 @@ async function waitForPortal(page) {
   } catch {
     return page.url().includes("portal.cfx.re");
   }
+}
+async function establishPortalSession(page) {
+  core2.info("Initialisation de la session portal...");
+  const apiReady = page.waitForResponse(
+    (res) => res.url().includes("portal-api.cfx.re") && res.status() >= 200 && res.status() < 400,
+    { timeout: NAVIGATION_TIMEOUT_MS }
+  ).then(() => true).catch(() => false);
+  await gotoPage(
+    page,
+    `${PORTAL_ORIGIN}/assets/created-assets`,
+    "networkidle0"
+  );
+  if (await apiReady) {
+    core2.info("Requ\xEAte portal-api confirm\xE9e.");
+  } else {
+    core2.warning(
+      "Aucune requ\xEAte portal-api d\xE9tect\xE9e \u2014 attente suppl\xE9mentaire..."
+    );
+    await new Promise((resolve7) => setTimeout(resolve7, 3e3));
+  }
+}
+async function verifyPortalApiSession(page, cookies) {
+  try {
+    await axios_default.get("https://portal-api.cfx.re/v1/me/assets?limit=1", {
+      headers: portalApiHeaders(cookies)
+    });
+    core2.info("Session portal API valid\xE9e.");
+    return;
+  } catch (error2) {
+    if (!axios_default.isAxiosError(error2) || error2.response?.status !== 401) {
+      throw error2;
+    }
+  }
+  const browserStatus = await page.evaluate(async () => {
+    const res = await fetch(
+      "https://portal-api.cfx.re/v1/me/assets?limit=1",
+      { credentials: "include" }
+    );
+    return res.status;
+  });
+  if (browserStatus === 401 || browserStatus === 403) {
+    throw new Error(PORTAL_API_UNAUTHORIZED);
+  }
+  if (browserStatus >= 400) {
+    throw new Error(
+      `Session portal API invalide (HTTP ${browserStatus}). ${PORTAL_API_UNAUTHORIZED}`
+    );
+  }
+  core2.info("Session portal API valid\xE9e via le navigateur.");
 }
 async function publishRefreshedCookie(browser) {
   const cookies = await browser.cookies();
@@ -92671,6 +92720,7 @@ async function run() {
     await publishRefreshedCookie(browser);
     core2.info("Redirected to CFX Portal. Uploading file ...");
     const cookies = await getCookies(browser);
+    await verifyPortalApiSession(page, cookies);
     if (assetName) {
       assetId = await resolveAssetId(assetName, cookies);
     }
@@ -92719,7 +92769,7 @@ async function run() {
         core2.error(`Response body: ${JSON.stringify(data, null, 2)}`);
       }
       core2.setFailed(
-        data?.message || data?.errors || message || "Unknown error"
+        status === 401 ? PORTAL_API_UNAUTHORIZED : data?.message || data?.errors || message || "Unknown error"
       );
     } else if (error2 instanceof Error) {
       if (error2.message.includes("Navigation timeout")) {
@@ -92735,18 +92785,18 @@ async function run() {
 async function loginToPortal(browser, page, maxRetries) {
   const redirectUrl = await getRedirectUrl(page, maxRetries);
   await setForumCookie(browser, page);
-  await gotoPage(page, redirectUrl);
-  if (await waitForPortal(page)) {
-    core2.info("Redirected to CFX Portal.");
-    return;
+  await gotoPage(page, redirectUrl, "networkidle0");
+  if (!await waitForPortal(page)) {
+    const currentUrl = page.url();
+    if (currentUrl.includes("forum.cfx.re") || currentUrl.includes("login")) {
+      throw new Error(EXPIRED_COOKIE_MESSAGE);
+    }
+    throw new Error(
+      `\xC9chec de redirection vers le portal (${currentUrl}). ${EXPIRED_COOKIE_MESSAGE}`
+    );
   }
-  const currentUrl = page.url();
-  if (currentUrl.includes("forum.cfx.re") || currentUrl.includes("login")) {
-    throw new Error(EXPIRED_COOKIE_MESSAGE);
-  }
-  throw new Error(
-    `\xC9chec de redirection vers le portal (${currentUrl}). ${EXPIRED_COOKIE_MESSAGE}`
-  );
+  core2.info("Redirected to CFX Portal.");
+  await establishPortalSession(page);
 }
 async function getRedirectUrl(page, maxRetries) {
   let loaded = false;
@@ -92794,9 +92844,30 @@ async function setForumCookie(browser, page) {
   core2.info("Cookies set. Following redirect...");
 }
 async function getCookies(browser) {
-  return await browser.cookies().then(
-    (cookies) => cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ")
+  const cookieUrls = [
+    PORTAL_ORIGIN,
+    "https://portal-api.cfx.re",
+    "https://forum.cfx.re"
+  ];
+  let cookies = await browser.cookies(...cookieUrls);
+  if (cookies.length === 0) {
+    cookies = await browser.cookies();
+  }
+  const byName = /* @__PURE__ */ new Map();
+  for (const cookie of cookies) {
+    if (!cookie.domain.includes("cfx.re")) {
+      continue;
+    }
+    byName.set(cookie.name, cookie);
+  }
+  const cookieHeader = [...byName.values()].map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
+  core2.debug(
+    `Cookies portal (${byName.size}): ${[...byName.keys()].join(", ") || "aucun"}`
   );
+  if (!byName.has("_t")) {
+    core2.warning("Cookie _t absent du jar \u2014 la session API peut \xE9chouer.");
+  }
+  return cookieHeader;
 }
 async function getZipPath(assetName, zipPath, makeZip) {
   core2.debug("Zip path: " + JSON.stringify(zipPath));
@@ -92841,9 +92912,7 @@ async function startReupload(zipPath, assetId, chunkSize, cookies, beta, version
       changelog
     },
     {
-      headers: {
-        Cookie: cookies
-      }
+      headers: portalApiHeaders(cookies)
     }
   );
   if (reUploadResponse.data.errors !== null) {
@@ -92882,7 +92951,7 @@ async function uploadZip(zipPath, assetId, chunkSize, cookies, beta, version, ch
       {
         headers: {
           ...form.getHeaders(),
-          Cookie: cookies
+          ...portalApiHeaders(cookies)
         }
       }
     );
@@ -92897,9 +92966,7 @@ async function completeUpload(assetId, versionId, cookies) {
     getUrl("COMPLETE_UPLOAD", { id: assetId, version_id: versionId }),
     {},
     {
-      headers: {
-        Cookie: cookies
-      }
+      headers: portalApiHeaders(cookies)
     }
   );
   core2.info("Upload completed.");
@@ -92951,7 +93018,7 @@ async function downloadAsset(assetId, cookies, downloadPath, versionId) {
   });
   core2.info(`Fetching download URL from ${portalDownloadUrl} ...`);
   const initialResponse = await axios_default.get(portalDownloadUrl, {
-    headers: { Cookie: cookies },
+    headers: portalApiHeaders(cookies),
     responseType: "json"
   });
   const realDownloadUrl = initialResponse.data.url;

@@ -40,7 +40,14 @@ function mockEmptyUpload(): void {
 
 registerCoreMock()
 registerAxiosMock()
-jest.unstable_mockModule('../src/utils.js', () => utilsMock)
+jest.unstable_mockModule('../src/utils.js', () => ({
+  ...utilsMock,
+  portalApiHeaders: (cookies: string) => ({
+    Cookie: cookies,
+    Origin: 'https://portal.cfx.re',
+    Referer: 'https://portal.cfx.re/'
+  })
+}))
 jest.unstable_mockModule('fs', () => {
   const actualFs = jest.requireActual<typeof import('fs')>('fs')
   return {
@@ -70,6 +77,9 @@ describe('main', () => {
     evaluate: jest.Mock
     url: jest.Mock
     close: jest.Mock
+    setDefaultNavigationTimeout: jest.Mock
+    waitForFunction: jest.Mock
+    waitForResponse: jest.Mock
   }
 
   beforeEach(() => {
@@ -82,7 +92,13 @@ describe('main', () => {
       goto: jest.fn(),
       evaluate: jest.fn(),
       url: jest.fn().mockReturnValue('https://portal.cfx.re'),
-      close: jest.fn()
+      close: jest.fn(),
+      setDefaultNavigationTimeout: jest.fn(),
+      waitForFunction: jest.fn().mockResolvedValue(undefined),
+      waitForResponse: jest.fn().mockResolvedValue({
+        url: () => 'https://portal-api.cfx.re/v1/me/assets',
+        status: () => 200
+      })
     }
 
     browserMock = {
@@ -119,6 +135,7 @@ describe('main', () => {
       if (type === 'SSO') return 'https://sso-url'
       return `https://api/${type}`
     })
+    ;(axios.get as jest.Mock).mockResolvedValue({ data: { items: [] } })
   })
 
   it('should fail if chunkSize is not a number', async () => {
@@ -424,6 +441,9 @@ describe('main', () => {
     pageMock.url.mockReturnValue('https://portal.cfx.re')
     ;(utils.getFxManifestVersion as jest.Mock).mockReturnValue('1.0.0')
     ;(utils.getChangelog as jest.Mock).mockReturnValue('test changelog')
+    ;(utils.getAssetVersions as jest.Mock).mockResolvedValue([
+      { id: 456, state: 'active', version: '1.0.0', packs: [{ id: 99 }] }
+    ])
     ;(axios.post as jest.Mock).mockResolvedValue({
       data: {
         asset_id: 123,
@@ -431,28 +451,35 @@ describe('main', () => {
         errors: null
       }
     })
-    ;(axios.get as jest.Mock)
-      .mockResolvedValueOnce({
-        data: {
-          items: [{ id: 123, name: 'test-asset', state: 'active' }]
-        }
-      })
-      .mockResolvedValueOnce({
-        data: { url: 'https://cdn.example.com/asset.zip' }
-      })
-      .mockResolvedValueOnce({
-        data: mockStream
-      })
+    ;(axios.get as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/me/assets?limit=1')) {
+        return Promise.resolve({ data: { items: [] } })
+      }
+      if (url.includes('PACK_DOWNLOAD') || url.includes('/packs/')) {
+        return Promise.resolve({
+          data: { url: 'https://cdn.example.com/asset.zip' }
+        })
+      }
+      if (url === 'https://cdn.example.com/asset.zip') {
+        return Promise.resolve({ data: mockStream })
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
 
     await main.run()
 
     expect(axios.get as jest.Mock).toHaveBeenCalledWith(
-      expect.stringContaining('/v1/me/assets'),
-      expect.objectContaining({ headers: { Cookie: expect.any(String) } })
+      expect.stringContaining('/v1/me/assets?limit=1'),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Cookie: expect.any(String) })
+      })
     )
     expect(axios.get as jest.Mock).toHaveBeenCalledWith(
-      'https://portal-api.cfx.re/v1/assets/123/download',
-      expect.objectContaining({ headers: { Cookie: expect.any(String) } })
+      'https://api/PACK_DOWNLOAD',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Cookie: expect.any(String) }),
+        responseType: 'json'
+      })
     )
     expect(axios.get as jest.Mock).toHaveBeenCalledWith(
       'https://cdn.example.com/asset.zip',

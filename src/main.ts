@@ -18,12 +18,16 @@ import {
   getFxManifestVersion,
   getChangelog,
   getAssetVersions,
-  deleteAssetVersion
+  deleteAssetVersion,
+  portalApiHeaders
 } from './utils.js'
 
 const NAVIGATION_TIMEOUT_MS = 60_000
+const PORTAL_ORIGIN = 'https://portal.cfx.re'
 const EXPIRED_COOKIE_MESSAGE =
   'FORUM_COOKIE expiré ou invalide. Connectez-vous sur forum.cfx.re, copiez le cookie _t (DevTools → Application → Cookies), mettez à jour le secret GitHub FORUM_COOKIE, puis relancez le workflow « Escrow — refresh cookie ».'
+const PORTAL_API_UNAUTHORIZED =
+  'Session portal API refusée (401). Mettez à jour FORUM_COOKIE (cookie _t sur forum.cfx.re), vérifiez que le compte forum a accès à portal.cfx.re / escrow, et que l\'asset existe (ex. atlas_blackout_dev).'
 
 async function gotoPage(
   page: Page,
@@ -47,6 +51,73 @@ async function waitForPortal(page: Page): Promise<boolean> {
   } catch {
     return page.url().includes('portal.cfx.re')
   }
+}
+
+async function establishPortalSession(page: Page): Promise<void> {
+  core.info('Initialisation de la session portal...')
+
+  const apiReady = page
+    .waitForResponse(
+      res =>
+        res.url().includes('portal-api.cfx.re') &&
+        res.status() >= 200 &&
+        res.status() < 400,
+      { timeout: NAVIGATION_TIMEOUT_MS }
+    )
+    .then(() => true)
+    .catch(() => false)
+
+  await gotoPage(
+    page,
+    `${PORTAL_ORIGIN}/assets/created-assets`,
+    'networkidle0'
+  )
+
+  if (await apiReady) {
+    core.info('Requête portal-api confirmée.')
+  } else {
+    core.warning(
+      'Aucune requête portal-api détectée — attente supplémentaire...'
+    )
+    await new Promise(resolve => setTimeout(resolve, 3000))
+  }
+}
+
+async function verifyPortalApiSession(
+  page: Page,
+  cookies: string
+): Promise<void> {
+  try {
+    await axios.get('https://portal-api.cfx.re/v1/me/assets?limit=1', {
+      headers: portalApiHeaders(cookies)
+    })
+    core.info('Session portal API validée.')
+    return
+  } catch (error) {
+    if (!axios.isAxiosError(error) || error.response?.status !== 401) {
+      throw error
+    }
+  }
+
+  const browserStatus = await page.evaluate(async () => {
+    const res = await fetch(
+      'https://portal-api.cfx.re/v1/me/assets?limit=1',
+      { credentials: 'include' }
+    )
+    return res.status
+  })
+
+  if (browserStatus === 401 || browserStatus === 403) {
+    throw new Error(PORTAL_API_UNAUTHORIZED)
+  }
+
+  if (browserStatus >= 400) {
+    throw new Error(
+      `Session portal API invalide (HTTP ${browserStatus}). ${PORTAL_API_UNAUTHORIZED}`
+    )
+  }
+
+  core.info('Session portal API validée via le navigateur.')
 }
 
 async function publishRefreshedCookie(browser: Browser): Promise<void> {
@@ -138,6 +209,7 @@ export async function run(): Promise<void> {
 
     core.info('Redirected to CFX Portal. Uploading file ...')
     const cookies = await getCookies(browser)
+    await verifyPortalApiSession(page, cookies)
 
     if (assetName) {
       assetId = await resolveAssetId(assetName, cookies)
@@ -197,7 +269,9 @@ export async function run(): Promise<void> {
       }
 
       core.setFailed(
-        data?.message || data?.errors || message || 'Unknown error'
+        status === 401
+          ? PORTAL_API_UNAUTHORIZED
+          : data?.message || data?.errors || message || 'Unknown error'
       )
     } else if (error instanceof Error) {
       if (error.message.includes('Navigation timeout')) {
@@ -227,21 +301,21 @@ async function loginToPortal(
   const redirectUrl = await getRedirectUrl(page, maxRetries)
   await setForumCookie(browser, page)
 
-  await gotoPage(page, redirectUrl)
+  await gotoPage(page, redirectUrl, 'networkidle0')
 
-  if (await waitForPortal(page)) {
-    core.info('Redirected to CFX Portal.')
-    return
+  if (!(await waitForPortal(page))) {
+    const currentUrl = page.url()
+    if (currentUrl.includes('forum.cfx.re') || currentUrl.includes('login')) {
+      throw new Error(EXPIRED_COOKIE_MESSAGE)
+    }
+
+    throw new Error(
+      `Échec de redirection vers le portal (${currentUrl}). ${EXPIRED_COOKIE_MESSAGE}`
+    )
   }
 
-  const currentUrl = page.url()
-  if (currentUrl.includes('forum.cfx.re') || currentUrl.includes('login')) {
-    throw new Error(EXPIRED_COOKIE_MESSAGE)
-  }
-
-  throw new Error(
-    `Échec de redirection vers le portal (${currentUrl}). ${EXPIRED_COOKIE_MESSAGE}`
-  )
+  core.info('Redirected to CFX Portal.')
+  await establishPortalSession(page)
 }
 
 /**
@@ -320,16 +394,43 @@ async function setForumCookie(browser: Browser, page: Page): Promise<void> {
 }
 
 /**
- * Gets the cookies from the browser.
+ * Gets the cookies from the browser for portal API requests.
  * @param browser
  * @returns {Promise<string>} Resolves with the cookies as a string.
  */
 async function getCookies(browser: Browser): Promise<string> {
-  return await browser
-    .cookies()
-    .then(cookies =>
-      cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ')
-    )
+  const cookieUrls = [
+    PORTAL_ORIGIN,
+    'https://portal-api.cfx.re',
+    'https://forum.cfx.re'
+  ]
+
+  let cookies = await browser.cookies(...cookieUrls)
+  if (cookies.length === 0) {
+    cookies = await browser.cookies()
+  }
+
+  const byName = new Map<string, (typeof cookies)[number]>()
+  for (const cookie of cookies) {
+    if (!cookie.domain.includes('cfx.re')) {
+      continue
+    }
+    byName.set(cookie.name, cookie)
+  }
+
+  const cookieHeader = [...byName.values()]
+    .map(cookie => `${cookie.name}=${cookie.value}`)
+    .join('; ')
+
+  core.debug(
+    `Cookies portal (${byName.size}): ${[...byName.keys()].join(', ') || 'aucun'}`
+  )
+
+  if (!byName.has('_t')) {
+    core.warning('Cookie _t absent du jar — la session API peut échouer.')
+  }
+
+  return cookieHeader
 }
 
 /**
@@ -417,9 +518,7 @@ async function startReupload(
       changelog: changelog
     },
     {
-      headers: {
-        Cookie: cookies
-      }
+      headers: portalApiHeaders(cookies)
     }
   )
 
@@ -486,7 +585,7 @@ async function uploadZip(
       {
         headers: {
           ...form.getHeaders(),
-          Cookie: cookies
+          ...portalApiHeaders(cookies)
         }
       }
     )
@@ -517,9 +616,7 @@ async function completeUpload(
     getUrl('COMPLETE_UPLOAD', { id: assetId, version_id: versionId }),
     {},
     {
-      headers: {
-        Cookie: cookies
-      }
+      headers: portalApiHeaders(cookies)
     }
   )
 
@@ -624,7 +721,7 @@ async function downloadAsset(
   core.info(`Fetching download URL from ${portalDownloadUrl} ...`)
 
   const initialResponse = await axios.get<{ url: string }>(portalDownloadUrl, {
-    headers: { Cookie: cookies },
+    headers: portalApiHeaders(cookies),
     responseType: 'json'
   })
 

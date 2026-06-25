@@ -3,6 +3,7 @@ import { jest } from '@jest/globals'
 export const coreMock = {
   getInput: jest.fn(),
   setFailed: jest.fn(),
+  setOutput: jest.fn(),
   info: jest.fn(),
   error: jest.fn(),
   debug: jest.fn(),
