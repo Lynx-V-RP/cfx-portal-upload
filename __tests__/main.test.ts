@@ -367,8 +367,22 @@ describe('main', () => {
       }
     })
     ;(utils.getAssetVersions as jest.Mock).mockResolvedValue([
-      { id: 456, version: '1.0.0' },
-      { id: 111, version: '0.9.0' }
+      {
+        id: 456,
+        version: '1.0.0',
+        state: 'active',
+        created_at: '2026-07-18T20:00:00Z',
+        changelog: '',
+        is_release_candidate: false
+      },
+      {
+        id: 111,
+        version: '0.9.0',
+        state: 'active',
+        created_at: '2026-07-17T20:00:00Z',
+        changelog: '',
+        is_release_candidate: false
+      }
     ])
 
     await main.run()
@@ -386,7 +400,85 @@ describe('main', () => {
     )
   })
 
-  it('should skip upload if skipUpload is true', async () => {
+    it('should not fail when portal refuses to delete the last version', async () => {
+    ;(core.getInput as jest.Mock).mockImplementation((name: string) => {
+      switch (name) {
+        case 'assetId':
+          return '123'
+        case 'zipPath':
+          return 'test.zip'
+        case 'cookie':
+          return 'test-cookie'
+        case 'chunkSize':
+          return '1024'
+        case 'maxRetries':
+          return '1'
+        case 'deleteOlderVersions':
+          return 'true'
+        case 'makeZip':
+        case 'skipUpload':
+        case 'beta':
+          return 'false'
+        default:
+          return ''
+      }
+    })
+
+    pageMock.evaluate.mockResolvedValueOnce({ url: 'https://forum-redirect' })
+    pageMock.url.mockReturnValue('https://portal.cfx.re')
+    ;(utils.getFxManifestVersion as jest.Mock).mockReturnValue('1.0.0')
+    ;(utils.getChangelog as jest.Mock).mockReturnValue('test changelog')
+    ;(axios.post as jest.Mock).mockResolvedValue({
+      data: {
+        asset_id: 123,
+        version_id: 456,
+        errors: null
+      }
+    })
+    ;(utils.getAssetVersions as jest.Mock).mockResolvedValue([
+      {
+        id: 456,
+        version: '1.0.0',
+        state: 'active',
+        created_at: '2026-07-18T20:00:00Z',
+        changelog: '',
+        is_release_candidate: false
+      },
+      {
+        id: 111,
+        version: '0.9.0',
+        state: 'active',
+        created_at: '2026-07-17T20:00:00Z',
+        changelog: '',
+        is_release_candidate: false
+      }
+    ])
+    const lastVersionError = {
+      isAxiosError: true,
+      message: 'Request failed with status code 409',
+      response: {
+        status: 409,
+        data: { error: 'cannot delete last version' }
+      }
+    }
+    ;(utils.deleteAssetVersion as jest.Mock).mockRejectedValue(lastVersionError)
+    ;(axios.isAxiosError as jest.Mock).mockImplementation(
+      (error: unknown) =>
+        Boolean(
+          error &&
+            typeof error === 'object' &&
+            (error as { isAxiosError?: boolean }).isAxiosError
+        )
+    )
+
+    await expect(main.run()).resolves.toBeUndefined()
+
+    expect(core.warning).toHaveBeenCalledWith(
+      expect.stringContaining('portal refuses to delete the last version')
+    )
+  })
+
+it('should skip upload if skipUpload is true', async () => {
     ;(core.getInput as jest.Mock).mockImplementation((name: string) => {
       if (name === 'skipUpload') return 'true'
       if (name === 'chunkSize') return '1024'

@@ -6,7 +6,7 @@ import axios from 'axios'
 
 import { createReadStream, statSync, createWriteStream } from 'fs'
 import { basename } from 'path'
-import { ReUploadResponse, SSOResponseBody } from './types.js'
+import { AssetDetail, ReUploadResponse, SSOResponseBody } from './types.js'
 import {
   deleteIfExists,
   resolveAssetId,
@@ -237,31 +237,25 @@ export async function run(): Promise<void> {
     )
 
     if (deleteOlderVersions) {
-      core.info('Deleting older versions ...')
-      const versions = await getAssetVersions(assetId, cookies)
-      for (const v of versions) {
-        if (v.id !== uploadedVersionId) {
-          await deleteAssetVersion(assetId, v.id, cookies)
-        }
-      }
+      await deleteOlderAssetVersions(assetId, uploadedVersionId, cookies)
     }
 
-      if (shouldDownload) {
-        await waitForAssetReady(
-          assetId,
-          cookies,
-          120000,
-          5000,
-          assetName,
-          uploadedVersionId
-        )
-        await downloadAsset(
-          assetId,
-          cookies,
-          downloadPath,
-          uploadedVersionId
-        )
-      }
+    if (shouldDownload) {
+      await waitForAssetReady(
+        assetId,
+        cookies,
+        120000,
+        5000,
+        assetName,
+        uploadedVersionId
+      )
+      await downloadAsset(
+        assetId,
+        cookies,
+        downloadPath,
+        uploadedVersionId
+      )
+    }
   } catch (error) {
     if (axios.isAxiosError(error)) {
       type ErrorData = {
@@ -696,8 +690,7 @@ async function completeUpload(
 }
 
 /**
- * Polls the assets endpoint to check if the asset is ready.
- * The asset is considered ready if its state is 'active'.
+ * Waits until the asset version is ready for download.
  * If assetName is provided, it will use it as a search parameter.
  * Otherwise, it will scan through pages until it finds the asset.
  *
@@ -747,6 +740,119 @@ async function waitForAssetReady(
     'Asset was not ready for download within the specified timeout.'
   )
 }
+
+function isCannotDeleteLastVersionError(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 409) {
+    return false
+  }
+
+  const data = error.response.data as
+    | { error?: string; error_code?: string; message?: string }
+    | undefined
+  const haystack = [
+    data?.error,
+    data?.error_code,
+    data?.message,
+    error.message
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  return (
+    haystack.includes('cannot delete last version') ||
+    haystack.includes('last version')
+  )
+}
+
+/**
+ * Wait until the uploaded version appears in the portal listing.
+ * Right after upload it is often missing, and deleting all except uploaded
+ * would wipe every listed version until the last one (409).
+ */
+async function waitForVersionListed(
+  assetId: string,
+  versionId: number,
+  cookies: string,
+  timeout = 60000,
+  interval = 2000
+): Promise<AssetDetail['versions']> {
+  const startTime = Date.now()
+
+  while (Date.now() - startTime < timeout) {
+    const versions = await getAssetVersions(assetId, cookies)
+    if (versions?.some(v => Number(v.id) === Number(versionId))) {
+      return versions
+    }
+
+    core.info(`Version ${versionId} not listed yet. Waiting...`)
+    await new Promise(resolve => setTimeout(resolve, interval))
+  }
+
+  core.warning(
+    `Version ${versionId} still not listed after ${timeout}ms; continuing with current listing.`
+  )
+  return getAssetVersions(assetId, cookies)
+}
+
+/**
+ * Delete every version except the one just uploaded.
+ * Never attempts to remove the last remaining version (portal 409).
+ */
+async function deleteOlderAssetVersions(
+  assetId: string,
+  uploadedVersionId: number,
+  cookies: string
+): Promise<void> {
+  core.info('Deleting older versions ...')
+
+  const versions = await waitForVersionListed(
+    assetId,
+    uploadedVersionId,
+    cookies
+  )
+
+  if (!versions?.length) {
+    core.warning('No versions found to clean up.')
+    return
+  }
+
+  const uploadedListed = versions.some(
+    v => Number(v.id) === Number(uploadedVersionId)
+  )
+
+  const keepId = uploadedListed
+    ? Number(uploadedVersionId)
+    : [...versions].sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0].id
+
+  if (!uploadedListed) {
+    core.warning(
+      `Uploaded version ${uploadedVersionId} not listed yet; keeping newest version ${keepId}.`
+    )
+  }
+
+  for (const v of versions) {
+    if (Number(v.id) === Number(keepId)) {
+      continue
+    }
+
+    try {
+      await deleteAssetVersion(assetId, v.id, cookies)
+    } catch (error) {
+      if (isCannotDeleteLastVersionError(error)) {
+        core.warning(
+          `Skipped deleting version ${v.id}: portal refuses to delete the last version.`
+        )
+        break
+      }
+      throw error
+    }
+  }
+}
+
 
 async function resolveDownloadPack(
   assetId: string,

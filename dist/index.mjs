@@ -92745,13 +92745,7 @@ async function run() {
       changelog
     );
     if (deleteOlderVersions) {
-      core2.info("Deleting older versions ...");
-      const versions = await getAssetVersions(assetId, cookies);
-      for (const v2 of versions) {
-        if (v2.id !== uploadedVersionId) {
-          await deleteAssetVersion(assetId, v2.id, cookies);
-        }
-      }
+      await deleteOlderAssetVersions(assetId, uploadedVersionId, cookies);
     }
     if (shouldDownload) {
       await waitForAssetReady(
@@ -93044,6 +93038,73 @@ async function waitForAssetReady(assetId, cookies, timeout2 = 6e4, interval = 5e
   throw new Error(
     "Asset was not ready for download within the specified timeout."
   );
+}
+function isCannotDeleteLastVersionError(error2) {
+  if (!axios_default.isAxiosError(error2) || error2.response?.status !== 409) {
+    return false;
+  }
+  const data = error2.response.data;
+  const haystack = [
+    data?.error,
+    data?.error_code,
+    data?.message,
+    error2.message
+  ].filter(Boolean).join(" ").toLowerCase();
+  return haystack.includes("cannot delete last version") || haystack.includes("last version");
+}
+async function waitForVersionListed(assetId, versionId, cookies, timeout2 = 6e4, interval = 2e3) {
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeout2) {
+    const versions = await getAssetVersions(assetId, cookies);
+    if (versions?.some((v2) => Number(v2.id) === Number(versionId))) {
+      return versions;
+    }
+    core2.info(`Version ${versionId} not listed yet. Waiting...`);
+    await new Promise((resolve7) => setTimeout(resolve7, interval));
+  }
+  core2.warning(
+    `Version ${versionId} still not listed after ${timeout2}ms; continuing with current listing.`
+  );
+  return getAssetVersions(assetId, cookies);
+}
+async function deleteOlderAssetVersions(assetId, uploadedVersionId, cookies) {
+  core2.info("Deleting older versions ...");
+  const versions = await waitForVersionListed(
+    assetId,
+    uploadedVersionId,
+    cookies
+  );
+  if (!versions?.length) {
+    core2.warning("No versions found to clean up.");
+    return;
+  }
+  const uploadedListed = versions.some(
+    (v2) => Number(v2.id) === Number(uploadedVersionId)
+  );
+  const keepId = uploadedListed ? Number(uploadedVersionId) : [...versions].sort(
+    (a2, b2) => new Date(b2.created_at).getTime() - new Date(a2.created_at).getTime()
+  )[0].id;
+  if (!uploadedListed) {
+    core2.warning(
+      `Uploaded version ${uploadedVersionId} not listed yet; keeping newest version ${keepId}.`
+    );
+  }
+  for (const v2 of versions) {
+    if (Number(v2.id) === Number(keepId)) {
+      continue;
+    }
+    try {
+      await deleteAssetVersion(assetId, v2.id, cookies);
+    } catch (error2) {
+      if (isCannotDeleteLastVersionError(error2)) {
+        core2.warning(
+          `Skipped deleting version ${v2.id}: portal refuses to delete the last version.`
+        );
+        break;
+      }
+      throw error2;
+    }
+  }
 }
 async function resolveDownloadPack(assetId, cookies, versionId) {
   const versions = await getAssetVersions(assetId, cookies);
